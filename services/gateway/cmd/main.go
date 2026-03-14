@@ -32,6 +32,11 @@ func main() {
 		authURL: authURL,
 	}
 
+	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/v1/auth/register", g.registerHandler)
