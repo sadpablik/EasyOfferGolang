@@ -12,6 +12,7 @@ import (
 
 	_ "easyoffer/gateway/docs"
 
+	"github.com/gin-gonic/gin"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -22,14 +23,20 @@ func main() {
 		log.Fatal("AUTH_SERVICE_URL is required")
 	}
 
+	questionURL := strings.TrimRight(strings.TrimSpace(os.Getenv("QUESTION_SERVICE_URL")), "/")
+	if questionURL == "" {
+		log.Fatal("QUESTION_SERVICE_URL is required")
+	}
+
 	port := strings.TrimSpace(os.Getenv("GATEWAY_PORT"))
 	if port == "" {
 		port = "8080"
 	}
 
 	g := &gateway{
-		client:  &http.Client{Timeout: 5 * time.Second},
-		authURL: authURL,
+		client:      &http.Client{Timeout: 5 * time.Second},
+		authURL:     authURL,
+		questionURL: questionURL,
 	}
 
 	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
@@ -37,16 +44,22 @@ func main() {
 		log.Fatal("JWT_SECRET is required")
 	}
 
-	mux := http.NewServeMux()
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
 
-	mux.HandleFunc("/api/v1/auth/register", g.registerHandler)
-	mux.HandleFunc("/api/v1/auth/login", g.loginHandler)
-	mux.HandleFunc("/health", healthHandler)
-	mux.Handle("/swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
+	r.POST("/api/v1/auth/register", g.registerHandler)
+	r.POST("/api/v1/auth/login", g.loginHandler)
+
+	protected := r.Group("/api/v1")
+	protected.Use(JWTAuthMiddleware(jwtSecret))
+	protected.POST("/questions", g.createQuestionHandler)
+
+	r.GET("/health", healthHandler)
+	r.GET("/swagger/*any", gin.WrapH(httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))))
 
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -68,8 +81,8 @@ func main() {
 // @Failure 409 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/register [post]
-func (g *gateway) registerHandler(w http.ResponseWriter, r *http.Request) {
-	g.proxyPost(w, r, g.authURL+"/register")
+func (g *gateway) registerHandler(c *gin.Context) {
+	g.proxyPost(c, g.authURL+"/register")
 }
 
 // loginHandler proxies login requests to Auth Service.
@@ -83,8 +96,29 @@ func (g *gateway) registerHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/login [post]
-func (g *gateway) loginHandler(w http.ResponseWriter, r *http.Request) {
-	g.proxyPost(w, r, g.authURL+"/login")
+func (g *gateway) loginHandler(c *gin.Context) {
+	g.proxyPost(c, g.authURL+"/login")
+}
+
+// createQuestionHandler proxies question creation requests to Question Service.
+// @Summary Create question
+// @Tags questions
+// @Accept json
+// @Produce json
+// @Param request body CreateQuestionRequest true "Create question"
+// @Success 201 {object} QuestionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions [post]
+func (g *gateway) createQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+	g.proxyPost(c, g.questionURL+"/questions", userID)
 }
 
 // healthHandler returns service liveness status.
@@ -93,57 +127,53 @@ func (g *gateway) loginHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {object} HealthResponse
 // @Router /health [get]
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+func healthHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, HealthResponse{Status: "ok"})
 }
 
-func (g *gateway) proxyPost(w http.ResponseWriter, r *http.Request, target string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
+func (g *gateway) proxyPost(c *gin.Context, target string, userID ...string) {
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
+	defer c.Request.Body.Close()
 
-	upstreamReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, target, bytes.NewReader(body))
+	upstreamReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
-		http.Error(w, "failed to build upstream request", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to build upstream request"})
 		return
 	}
 
-	if ct := strings.TrimSpace(r.Header.Get("Content-Type")); ct != "" {
+	if ct := strings.TrimSpace(c.GetHeader("Content-Type")); ct != "" {
 		upstreamReq.Header.Set("Content-Type", ct)
 	} else {
 		upstreamReq.Header.Set("Content-Type", "application/json")
 	}
-
+	if len(userID) > 0 && strings.TrimSpace(userID[0]) != "" {
+        upstreamReq.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
+    }
 	resp, err := g.client.Do(upstreamReq)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			http.Error(w, "upstream closed connection", http.StatusBadGateway)
+			c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream closed connection"})
 			return
 		}
-		http.Error(w, "upstream service unavailable", http.StatusBadGateway)
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream service unavailable"})
 		return
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		http.Error(w, "failed to read upstream response", http.StatusBadGateway)
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "failed to read upstream response"})
 		return
 	}
 
 	if ct := strings.TrimSpace(resp.Header.Get("Content-Type")); ct != "" {
-		w.Header().Set("Content-Type", ct)
+		c.Header("Content-Type", ct)
 	}
-	w.WriteHeader(resp.StatusCode)
-	_, _ = w.Write(respBody)
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), respBody)
+
+
 }

@@ -6,10 +6,14 @@ import "net/http"
 // @version 1.0
 // @description Public API exposed by the Gateway service.
 // @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 type gateway struct {
-	client  *http.Client
-	authURL string
+	client      *http.Client
+	authURL     string
+	questionURL string
 }
 
 type RegisterRequest struct {
@@ -44,4 +48,18 @@ type ErrorResponse struct {
 
 type HealthResponse struct {
 	Status string `json:"status"`
+}
+
+type CreateQuestionRequest struct {
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	AuthorID string `json:"author_id"`
+}
+
+type QuestionResponse struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	AuthorID  string `json:"author_id"`
+	CreatedAt string `json:"created_at"`
 }
