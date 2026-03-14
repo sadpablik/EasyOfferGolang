@@ -5,6 +5,12 @@ services:
       POSTGRES_DB: easyoffer
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d easyoffer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     ports:
       - "5432:5432"
     volumes:
@@ -50,7 +56,8 @@ services:
       - DB_NAME=easyoffer
       - JWT_SECRET=your-secret-key
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
 #  question-service:
 #    build: ../services/question
@@ -78,14 +85,16 @@ services:
 #      - redis
 #      - kafka
 
-#  gateway:
-#    build: ../services/gateway
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      - auth-service
-#      - question-service
-#      - interview-service
+  gateway:
+    build: ../services/gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8081
+    depends_on:
+      - auth-service
+      # - question-service
+      # - interview-service
 
 #  prometheus:
 #    image: prom/prometheus
