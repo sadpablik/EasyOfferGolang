@@ -6,11 +6,11 @@ import (
 )
 
 type User struct{
-	ID       string `json:"id" db:"id"`
-	Email	string `json:"email" db:"email"`
-	PasswordHash string `json:"-" db:"password_hash"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	Role	 string `json:"role" db:"role"` // e.g., "user", "admin"
+	ID       string `gorm:"type:uuid;primaryKey" json:"id"`
+	Email	string  `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash string `gorm:"not null" json:"-"`
+	CreatedAt time.Time `gorm:"not null" json:"created_at"`
+	Role	 string `gorm:"not null;default:user" json:"role"`
 }
 
 func (u *User) IsAdmin() bool {

@@ -1,13 +1,16 @@
 package handlers
 
 import (
-    "easyoffer/auth/internal/domain"
-    "easyoffer/auth/internal/service"
-    "net/http"
-    "time"
+	"easyoffer/auth/internal/domain"
+	"easyoffer/auth/internal/service"
+	"errors"
+	"net/http"
+	"time"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
+
+
 
 type AuthHandler struct {
     authService service.AuthService
@@ -55,7 +58,6 @@ func toUserResponse(user *domain.User) UserResponse {
         Role:      user.Role,
     }
 }
-
 // @Summary Register user
 // @Tags auth
 // @Accept json
@@ -63,6 +65,7 @@ func toUserResponse(user *domain.User) UserResponse {
 // @Param request body RegisterRequest true "User registration"
 // @Success 201 {object} RegisterResponse
 // @Failure 400 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -74,7 +77,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
     user, token, err := h.authService.Register(req.Email, req.Password)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to register user"})
+        if errors.Is(err, service.ErrEmailAlreadyExists) {
+            c.JSON(http.StatusConflict, ErrorResponse{Error: "email already exists"})
+            return
+        }
+        c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
         return
     }
 

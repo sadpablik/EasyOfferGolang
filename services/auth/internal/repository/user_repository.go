@@ -1,9 +1,13 @@
 package repository
 
 import (
-    "gorm.io/gorm"
-    "easyoffer/auth/internal/domain"
+	"easyoffer/auth/internal/domain"
+	"errors"
+
+	"gorm.io/gorm"
 )
+
+var ErrEmailAlreadyExists = errors.New("email already exists")
 
 type UserRepository interface{
 	Create(user *domain.User) error
@@ -19,7 +23,13 @@ func NewUserRepository(db *gorm.DB) UserRepository{
 }
 
 func (r *userRepository) Create(user *domain.User) error{
-	return r.db.Create(user).Error
+	err := r.db.Create(user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrEmailAlreadyExists
+		}
+	}
+	return err
 }
 
 func (r *userRepository) GetByEmail(email string) (*domain.User, error){
