@@ -2,15 +2,15 @@ package main
 
 import (
 	"bytes"
+	_ "easyoffer/gateway/docs"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	_ "easyoffer/gateway/docs"
 
 	"github.com/gin-gonic/gin"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
@@ -53,7 +53,14 @@ func main() {
 	protected := r.Group("/api/v1")
 	protected.Use(JWTAuthMiddleware(jwtSecret))
 	protected.POST("/questions", g.createQuestionHandler)
-
+	protected.PATCH("/questions/:id", g.patchQuestionHandler)
+	protected.POST("/questions/:id/reviews", g.reviewQuestionHandler)
+	protected.GET("/questions/:id/review", g.getMyQuestionReviewHandler)
+	protected.GET("/questions", g.listQuestionsHandler)
+	protected.GET("/questions/:id", g.getQuestionHandler)
+	protected.GET("/me/reviews", g.listMyReviewsHandler)
+	protected.GET("/me/questions", g.listMyQuestionsHandler)
+	protected.DELETE("/questions/:id", g.deleteQuestionHandler)
 	r.GET("/health", healthHandler)
 	r.GET("/swagger/*any", gin.WrapH(httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))))
 
@@ -83,6 +90,68 @@ func main() {
 // @Router /api/v1/auth/register [post]
 func (g *gateway) registerHandler(c *gin.Context) {
 	g.proxyPost(c, g.authURL+"/register")
+}
+
+// @Summary Get my questions
+// @Tags questions
+// @Produce json
+// @Param status query string false "Filter by status: know, dont_know, repeat"
+// @Param category query string false "Filter by category: resume, theory, practice"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Param offset query int false "Offset (default 0)"
+// @Success 200 {object} MyQuestionsListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/me/questions [get]
+func (g *gateway) listMyQuestionsHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/me/questions"
+
+	query := url.Values{}
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		query.Set("status", status)
+	}
+	if category := strings.TrimSpace(c.Query("category")); category != "" {
+		query.Set("category", category)
+	}
+	if limit := strings.TrimSpace(c.Query("limit")); limit != "" {
+		query.Set("limit", limit)
+	}
+	if offset := strings.TrimSpace(c.Query("offset")); offset != "" {
+		query.Set("offset", offset)
+	}
+
+	if encoded := query.Encode(); encoded != "" {
+		target += "?" + encoded
+	}
+
+	g.proxyGet(c, target, userID)
+}
+
+// @Summary Get my review for question
+// @Tags questions
+// @Produce json
+// @Param id path string true "Question ID"
+// @Success 200 {object} QuestionReviewResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions/{id}/review [get]
+func (g *gateway) getMyQuestionReviewHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/questions/" + c.Param("id") + "/review"
+	g.proxyGet(c, target, userID)
 }
 
 // loginHandler proxies login requests to Auth Service.
@@ -121,6 +190,187 @@ func (g *gateway) createQuestionHandler(c *gin.Context) {
 	g.proxyPost(c, g.questionURL+"/questions", userID)
 }
 
+// patchQuestionHandler proxies question update requests to Question Service.
+// @Summary Update question
+// @Tags questions
+// @Accept json
+// @Produce json
+// @Param id path string true "Question ID"
+// @Param request body UpdateQuestionRequest true "Update question"
+// @Success 200 {object} QuestionResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions/{id} [patch]
+func (g *gateway) patchQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/questions/" + c.Param("id")
+	g.proxyPatch(c, target, userID)
+}
+
+// reviewQuestionHandler proxies review requests to Question Service.
+// @Summary Review a question (know / dont_know / repeat)
+// @Tags questions
+// @Accept json
+// @Produce json
+// @Param id path string true "Question ID"
+// @Param request body ReviewQuestionRequest true "Review"
+// @Success 200 {object} QuestionReviewResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions/{id}/reviews [post]
+func (g *gateway) reviewQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+	questionID := c.Param("id")
+	g.proxyPost(c, g.questionURL+"/questions/"+questionID+"/reviews", userID)
+}
+
+// listQuestionsHandler proxies question list requests to Question Service.
+// @Summary List questions
+// @Tags questions
+// @Produce json
+// @Param category query string false "Filter by category: resume, theory, practice"
+// @Param status query string false "Filter by my review status: know, dont_know, repeat"
+// @Param answer_format query string false "Filter by answer format: text, code"
+// @Param language query string false "Filter by language (case-insensitive exact match)"
+// @Param q query string false "Search in title/content (case-insensitive)"
+// @Param unreviewed query bool false "Only questions without my review"
+// @Param limit query int false "Page size (default 20, max 100)"
+// @Param offset query int false "Offset (default 0)"
+// @Param sort_by query string false "Sort field: created_at, title"
+// @Param order query string false "Sort order: asc, desc"
+// @Success 200 {object} QuestionsListResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions [get]
+func (g *gateway) listQuestionsHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/questions"
+
+	query := url.Values{}
+	if category := strings.TrimSpace(c.Query("category")); category != "" {
+		query.Set("category", category)
+	}
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		query.Set("status", status)
+	}
+	if answerFormat := strings.TrimSpace(c.Query("answer_format")); answerFormat != "" {
+		query.Set("answer_format", answerFormat)
+	}
+	if language := strings.TrimSpace(c.Query("language")); language != "" {
+		query.Set("language", language)
+	}
+	if searchQuery := strings.TrimSpace(c.Query("q")); searchQuery != "" {
+		query.Set("q", searchQuery)
+	}
+	if unreviewed := strings.TrimSpace(c.Query("unreviewed")); unreviewed != "" {
+		query.Set("unreviewed", unreviewed)
+	}
+	if limit := strings.TrimSpace(c.Query("limit")); limit != "" {
+		query.Set("limit", limit)
+	}
+	if offset := strings.TrimSpace(c.Query("offset")); offset != "" {
+		query.Set("offset", offset)
+	}
+	if sortBy := strings.TrimSpace(c.Query("sort_by")); sortBy != "" {
+		query.Set("sort_by", sortBy)
+	}
+	if order := strings.TrimSpace(c.Query("order")); order != "" {
+		query.Set("order", order)
+	}
+
+	if encoded := query.Encode(); encoded != "" {
+		target += "?" + encoded
+	}
+
+	g.proxyGet(c, target, userID)
+}
+
+// getQuestionHandler proxies single question fetch to Question Service.
+// @Summary Get question by ID
+// @Tags questions
+// @Produce json
+// @Param id path string true "Question ID"
+// @Success 200 {object} QuestionResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions/{id} [get]
+func (g *gateway) getQuestionHandler(c *gin.Context) {
+	g.proxyGet(c, g.questionURL+"/questions/"+c.Param("id"))
+}
+
+// @Summary Get my question reviews
+// @Tags questions
+// @Produce json
+// @Param status query string false "Filter by status: know, dont_know, repeat"
+// @Success 200 {object} ReviewsListResponse
+// @Failure 401 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/me/reviews [get]
+func (g *gateway) listMyReviewsHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/me/reviews"
+
+	query := url.Values{}
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		query.Set("status", status)
+	}
+
+	if encoded := query.Encode(); encoded != "" {
+		target += "?" + encoded
+	}
+
+	g.proxyGet(c, target, userID)
+}
+
+// @Summary Delete question
+// @Tags questions
+// @Produce json
+// @Param id path string true "Question ID"
+// @Success 204 {string} string "No Content"
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/questions/{id} [delete]
+func (g *gateway) deleteQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.questionURL + "/questions/" + c.Param("id")
+	g.proxyDelete(c, target, userID)
+}
+
 // healthHandler returns service liveness status.
 // @Summary Gateway health check
 // @Tags health
@@ -151,8 +401,8 @@ func (g *gateway) proxyPost(c *gin.Context, target string, userID ...string) {
 		upstreamReq.Header.Set("Content-Type", "application/json")
 	}
 	if len(userID) > 0 && strings.TrimSpace(userID[0]) != "" {
-        upstreamReq.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
-    }
+		upstreamReq.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
+	}
 	resp, err := g.client.Do(upstreamReq)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
@@ -174,6 +424,102 @@ func (g *gateway) proxyPost(c *gin.Context, target string, userID ...string) {
 		c.Header("Content-Type", ct)
 	}
 	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), respBody)
+}
 
+func (g *gateway) proxyPatch(c *gin.Context, target string, userID ...string) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+	defer c.Request.Body.Close()
 
+	upstreamReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPatch, target, bytes.NewReader(body))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to build upstream request"})
+		return
+	}
+
+	if ct := strings.TrimSpace(c.GetHeader("Content-Type")); ct != "" {
+		upstreamReq.Header.Set("Content-Type", ct)
+	} else {
+		upstreamReq.Header.Set("Content-Type", "application/json")
+	}
+	if len(userID) > 0 && strings.TrimSpace(userID[0]) != "" {
+		upstreamReq.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
+	}
+
+	resp, err := g.client.Do(upstreamReq)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream closed connection"})
+			return
+		}
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "failed to read upstream response"})
+		return
+	}
+
+	if ct := strings.TrimSpace(resp.Header.Get("Content-Type")); ct != "" {
+		c.Header("Content-Type", ct)
+	}
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), respBody)
+}
+
+func (g *gateway) proxyGet(c *gin.Context, target string, userID ...string) {
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, target, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to build upstream request"})
+		return
+	}
+	if len(userID) > 0 && strings.TrimSpace(userID[0]) != "" {
+		req.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
+	}
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "failed to read upstream response"})
+		return
+	}
+
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+}
+
+func (g *gateway) proxyDelete(c *gin.Context, target string, userID ...string) {
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodDelete, target, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to build upstream request"})
+		return
+	}
+	if len(userID) > 0 && strings.TrimSpace(userID[0]) != "" {
+		req.Header.Set("X-User-ID", strings.TrimSpace(userID[0]))
+	}
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "upstream service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, ErrorResponse{Error: "failed to read upstream response"})
+		return
+	}
+
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }

@@ -1,60 +1,10 @@
-package main
-
-import "net/http"
-
-// @title EasyOffer Gateway API
-// @version 1.0
-// @description Public API exposed by the Gateway service.
-// @BasePath /
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-
-type gateway struct {
-	client      *http.Client
-	authURL     string
-	questionURL string
-}
-
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type UserResponse struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
-	Role      string `json:"role"`
-}
-
-type RegisterResponse struct {
-	User  UserResponse `json:"user"`
-	Token string       `json:"token"`
-}
-
-type LoginResponse struct {
-	Token string `json:"token"`
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-type HealthResponse struct {
-	Status string `json:"status"`
-}
+package handlers
 
 type CreateQuestionRequest struct {
-	Title        string `json:"title"`
-	Content      string `json:"content"`
-	Category     string `json:"category"`
-	AnswerFormat string `json:"answer_format"`
+	Title        string `json:"title" binding:"required"`
+	Content      string `json:"content" binding:"required"`
+	Category     string `json:"category" binding:"required"`
+	AnswerFormat string `json:"answer_format" binding:"required"`
 	Language     string `json:"language"`
 	StarterCode  string `json:"starter_code"`
 }
@@ -66,6 +16,12 @@ type UpdateQuestionRequest struct {
 	AnswerFormat *string `json:"answer_format,omitempty"`
 	Language     *string `json:"language,omitempty"`
 	StarterCode  *string `json:"starter_code,omitempty"`
+}
+
+type ReviewQuestionRequest struct {
+	Status     string `json:"status" binding:"required"`
+	UserAnswer string `json:"user_answer"`
+	Note       string `json:"note"`
 }
 
 type QuestionResponse struct {
@@ -80,12 +36,9 @@ type QuestionResponse struct {
 	CreatedAt    string `json:"created_at"`
 }
 
-type ReviewQuestionRequest struct {
-	Status     string `json:"status"`
-	UserAnswer string `json:"user_answer"`
-	Note       string `json:"note"`
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
-
 type QuestionReviewResponse struct {
 	ID         string `json:"id"`
 	UserID     string `json:"user_id"`
@@ -112,19 +65,21 @@ type MyQuestionResponse struct {
 
 type MyQuestionsListResponse struct {
 	Questions []MyQuestionResponse `json:"questions"`
-	Total     int64                `json:"total"`
-	Limit     int                  `json:"limit"`
-	Offset    int                  `json:"offset"`
+	Total     int64                  `json:"total"`
+	Limit int 		`json:"limit"`
+	Offset int 		`json:"offset"`
 }
 
-type QuestionsListResponse struct {
-	Questions []QuestionResponse `json:"questions"`
-	Total     int64              `json:"total"`
-	Limit     int                `json:"limit"`
-	Offset    int                `json:"offset"`
-}
+
 
 type ReviewsListResponse struct {
 	Reviews []QuestionReviewResponse `json:"reviews"`
 	Total   int                      `json:"total"`
+}
+
+type QuestionsListResponse struct {
+	Questions []QuestionResponse `json:"questions"`
+	Total     int64                `json:"total"`
+	Limit int 		`json:"limit"`
+	Offset int 		`json:"offset"`
 }

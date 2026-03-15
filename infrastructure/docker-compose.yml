@@ -58,6 +58,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      auth-migrations:
+        condition: service_completed_successfully
+
+  auth-migrations:
+    image: migrate/migrate:v4.18.3
+    command:
+      - "-path"
+      - "/migrations"
+      - "-database"
+      - "postgres://user:password@postgres:5432/easyoffer?sslmode=disable&x-migrations-table=schema_migrations_auth"
+      - "up"
+    volumes:
+      - ../services/auth/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   question-service:
     build: ../services/question
@@ -74,6 +91,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      question-migrations:
+        condition: service_completed_successfully
+
+  question-migrations:
+    image: migrate/migrate:v4.18.3
+    command:
+      - "-path"
+      - "/migrations"
+      - "-database"
+      - "postgres://user:password@postgres:5432/easyoffer?sslmode=disable&x-migrations-table=schema_migrations_question"
+      - "up"
+    volumes:
+      - ../services/question/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
 #  interview-service:
 #    build: ../services/interview

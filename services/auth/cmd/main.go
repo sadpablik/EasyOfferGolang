@@ -3,7 +3,6 @@ package main
 import (
 	"easyoffer/auth/api/handlers"
 	"easyoffer/auth/internal/config"
-	"easyoffer/auth/internal/domain"
 	"easyoffer/auth/internal/repository"
 	"easyoffer/auth/internal/service"
 	"log"
@@ -48,11 +47,6 @@ func main() {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{TranslateError: true})
 	if err != nil {
 		log.Fatal("failed to connect to database:", err)
-	}
-
-	// В prod лучше миграции через golang-migrate, тут оставляем для локальной разработки
-	if err := db.AutoMigrate(&domain.User{}); err != nil {
-		log.Fatal("failed to migrate database:", err)
 	}
 
 	repo := repository.NewUserRepository(db)
