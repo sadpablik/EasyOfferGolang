@@ -2,8 +2,13 @@ package repository
 
 import (
 	"easyoffer/question/internal/domain"
+	"easyoffer/question/internal/events"
+	"encoding/json"
 	"errors"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -30,15 +35,36 @@ func NewQuestionRepository(db *gorm.DB) QuestionRepository {
 }
 
 func (r *questionRepository) Create(question *domain.Question) error {
-	err := r.db.Create(question).Error
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return ErrQuestionAlreadyExists
-	}
-	return err
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(question).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return ErrQuestionAlreadyExists
+			}
+			return err
+		}
+
+		// Пишем outbox в той же транзакции, что и бизнес-данные.
+		outbox, err := newOutboxEvent(events.EventQuestionCreated, question, "")
+		if err != nil {
+			return err
+		}
+		return tx.Create(outbox).Error
+	})
 }
 
 func (r *questionRepository) Update(question *domain.Question) error {
-	return r.db.Save(question).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(question).Error; err != nil {
+			return err
+		}
+
+		// Обновление вопроса и событие фиксируются атомарно.
+		outbox, err := newOutboxEvent(events.EventQuestionUpdated, question, "")
+		if err != nil {
+			return err
+		}
+		return tx.Create(outbox).Error
+	})
 }
 
 func (r *questionRepository) UpsertReview(review *domain.QuestionReview) error {
@@ -220,6 +246,63 @@ func (r *questionRepository) Delete(questionID string) error {
 			return gorm.ErrRecordNotFound
 		}
 
-		return nil
+		// Событие удаления пишем только если удаление реально произошло.
+		outbox, err := newOutboxEvent(events.EventQuestionDeleted, nil, questionID)
+		if err != nil {
+			return err
+		}
+		return tx.Create(outbox).Error
 	})
+}
+
+func newOutboxEvent(eventType string, q *domain.Question, questionID string) (*domain.OutboxEvent, error) {
+	id := strings.TrimSpace(questionID)
+	if q != nil && id == "" {
+		id = strings.TrimSpace(q.ID)
+	}
+	if id == "" {
+		return nil, errors.New("question id is required for outbox")
+	}
+
+	payload := events.QuestionPayload{
+		QuestionID: id,
+	}
+	if q != nil {
+		payload.AuthorID = q.AuthorID
+		payload.Title = q.Title
+		payload.Content = q.Content
+		payload.Category = q.Category
+		payload.AnswerFormat = q.AnswerFormat
+		payload.Language = q.Language
+		payload.StarterCode = q.StarterCode
+		payload.CreatedAt = q.CreatedAt
+	}
+
+	occurredAt := time.Now().UTC()
+	eventID := uuid.NewString()
+
+	wireEvent := events.QuestionEvent{
+		EventID:    eventID,
+		EventType:  eventType,
+		OccurredAt: occurredAt,
+		Version:    1,
+		Payload:    payload,
+	}
+
+	raw, err := json.Marshal(wireEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.OutboxEvent{
+		ID:            eventID,
+		AggregateType: "question",
+		AggregateID:   id,
+		EventType:     eventType,
+		Payload:       string(raw),
+		Status:        domain.OutboxStatusPending,
+		Attempts:      0,
+		NextRetryAt:   occurredAt,
+		CreatedAt:     occurredAt,
+	}, nil
 }

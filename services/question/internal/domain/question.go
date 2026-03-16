@@ -39,7 +39,22 @@ type QuestionWithReview struct {
 	ReviewedAt   time.Time    `gorm:"type:timestamp" json:"reviewed_at,omitempty"`
 }
 
+type OutboxEvent struct {
+	ID            string       `gorm:"type:uuid;primaryKey" json:"id"`
+	AggregateType string       `gorm:"type:varchar(64);not null" json:"aggregate_type"`
+	AggregateID   string       `gorm:"type:varchar(255);not null" json:"aggregate_id"`
+	EventType     string       `gorm:"type:varchar(128);not null" json:"event_type"`
+	Payload       string       `gorm:"type:jsonb;not null" json:"payload"`
+	Status        OutboxStatus `gorm:"type:varchar(32);not null;default:'pending';index:idx_outbox_status_next_retry_created,priority:1" json:"status"`
+	Attempts      int          `gorm:"not null;default:0" json:"attempts"`
+	NextRetryAt   time.Time    `gorm:"type:timestamp;not null;default:CURRENT_TIMESTAMP;index:idx_outbox_status_next_retry_created,priority:2" json:"next_retry_at"`
+	SentAt        *time.Time   `gorm:"type:timestamp" json:"sent_at,omitempty"`
+	LastError     string       `gorm:"type:text" json:"last_error,omitempty"`
+	CreatedAt     time.Time    `gorm:"type:timestamp;not null;default:CURRENT_TIMESTAMP;index:idx_outbox_status_next_retry_created,priority:3" json:"created_at"`
+}
+
 type QuestionCategory string
+type OutboxStatus string
 
 const (
 	CategoryResume   QuestionCategory = "resume"
@@ -57,7 +72,10 @@ const (
 type ReviewStatus string
 
 const (
-	StatusKnow     ReviewStatus = "know"
-	StatusDontKnow ReviewStatus = "dont_know"
-	StatusRepeat   ReviewStatus = "repeat"
+	StatusKnow          ReviewStatus = "know"
+	StatusDontKnow      ReviewStatus = "dont_know"
+	StatusRepeat        ReviewStatus = "repeat"
+	OutboxStatusPending OutboxStatus = "pending"
+	OutboxStatusSent    OutboxStatus = "sent"
+	OutboxStatusFailed  OutboxStatus = "failed"
 )
