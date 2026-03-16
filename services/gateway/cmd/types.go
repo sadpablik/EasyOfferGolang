@@ -2,8 +2,6 @@ package main
 
 import "net/http"
 
-
-
 type gateway struct {
 	client       *http.Client
 	authURL      string

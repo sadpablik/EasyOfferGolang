@@ -1,29 +1,29 @@
 package service
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
-    "easyoffer/interview/internal/client"
-    "easyoffer/interview/internal/domain"
-    "easyoffer/interview/internal/repository"
+	"easyoffer/interview/internal/client"
+	"easyoffer/interview/internal/domain"
+	"easyoffer/interview/internal/repository"
 
-    "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
 var (
-    ErrMissingUserID        = errors.New("missing user id")
-    ErrInvalidCount         = errors.New("question count must be between 1 and 50")
-    ErrInvalidStatus        = errors.New("invalid review status")
-    ErrSessionNotFound      = errors.New("session not found")
-    ErrSessionForbidden     = errors.New("session belongs to another user")
-    ErrSessionFinished      = errors.New("session is already finished")
-    ErrSessionNotFinished   = errors.New("session is not finished yet")
-    ErrQuestionNotInSession = errors.New("question does not belong to this session")
-    ErrNoQuestionsAvailable = errors.New("no questions available")
-    ErrNotImplemented       = errors.New("interview service is not implemented")
+	ErrMissingUserID        = errors.New("missing user id")
+	ErrInvalidCount         = errors.New("question count must be between 1 and 50")
+	ErrInvalidStatus        = errors.New("invalid review status")
+	ErrSessionNotFound      = errors.New("session not found")
+	ErrSessionForbidden     = errors.New("session belongs to another user")
+	ErrSessionFinished      = errors.New("session is already finished")
+	ErrSessionNotFinished   = errors.New("session is not finished yet")
+	ErrQuestionNotInSession = errors.New("question does not belong to this session")
+	ErrNoQuestionsAvailable = errors.New("no questions available")
+	ErrNotImplemented       = errors.New("interview service is not implemented")
 )
 
 type StartSessionInput struct {
@@ -49,21 +49,21 @@ type InterviewService interface {
 }
 
 type interviewService struct {
-    repo       repository.SessionRepository
-    client     client.QuestionClient
-    sessionTTL time.Duration
+	repo       repository.SessionRepository
+	client     client.QuestionClient
+	sessionTTL time.Duration
 }
 
 func NewInterviewService(
-    repo repository.SessionRepository,
-    qClient client.QuestionClient,
-    sessionTTL time.Duration,
+	repo repository.SessionRepository,
+	qClient client.QuestionClient,
+	sessionTTL time.Duration,
 ) InterviewService {
-    return &interviewService{
-        repo:       repo,
-        client:     qClient,
-        sessionTTL: sessionTTL,
-    }
+	return &interviewService{
+		repo:       repo,
+		client:     qClient,
+		sessionTTL: sessionTTL,
+	}
 }
 
 func (s *interviewService) StartSession(ctx context.Context, userID string, input StartSessionInput) (*domain.InterviewSession, *domain.QuestionSnapshot, error) {
@@ -81,7 +81,7 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 		UserID:       userID,
 		Category:     input.Category,
 		AnswerFormat: input.AnswerFormat,
-		Language:   input.Language,
+		Language:     input.Language,
 		Limit:        count,
 	})
 	if err != nil {
@@ -90,47 +90,47 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 	if len(questions) == 0 {
 		return nil, nil, ErrNoQuestionsAvailable
 	}
-	
+
 	session := &domain.InterviewSession{
-		ID:        uuid.NewString(),
-		UserID:    userID,
-		Questions: questions,
+		ID:           uuid.NewString(),
+		UserID:       userID,
+		Questions:    questions,
 		CurrentIndex: 0,
-		Answers: make(map[string]domain.SessionAnswer),
-		StartedAt: time.Now().UTC(),
+		Answers:      make(map[string]domain.SessionAnswer),
+		StartedAt:    time.Now().UTC(),
 	}
 
 	if err := s.repo.Save(ctx, session); err != nil {
 		return nil, nil, fmt.Errorf("failed to save session: %w", err)
 	}
-	
+
 	firstQuestion := &session.Questions[0]
 	return session, firstQuestion, nil
 }
 
 func (s *interviewService) GetNextQuestion(ctx context.Context, userID, sessionID string) (*domain.QuestionSnapshot, bool, error) {
-    session, err := s.getOwnedSession(ctx, userID, sessionID)
-    if err != nil {
-        return nil, false, err
-    }
+	session, err := s.getOwnedSession(ctx, userID, sessionID)
+	if err != nil {
+		return nil, false, err
+	}
 
-    if session.FinishedAt != nil {
-        return nil, false, ErrSessionFinished
-    }
+	if session.FinishedAt != nil {
+		return nil, false, ErrSessionFinished
+	}
 
-    for i := session.CurrentIndex; i < len(session.Questions); i++ {
-        if _, answered := session.Answers[session.Questions[i].ID]; answered {
-            continue
-        }
+	for i := session.CurrentIndex; i < len(session.Questions); i++ {
+		if _, answered := session.Answers[session.Questions[i].ID]; answered {
+			continue
+		}
 
-        session.CurrentIndex = i
-        if err := s.repo.Save(ctx, session); err != nil {
-            return nil, false, fmt.Errorf("failed to update session index: %w", err)
-        }
-        return &session.Questions[i], true, nil
-    }
+		session.CurrentIndex = i
+		if err := s.repo.Save(ctx, session); err != nil {
+			return nil, false, fmt.Errorf("failed to update session index: %w", err)
+		}
+		return &session.Questions[i], true, nil
+	}
 
-    return nil, false, nil
+	return nil, false, nil
 }
 
 func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID string, input SubmitAnswerInput) error {

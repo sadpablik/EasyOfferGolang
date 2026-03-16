@@ -1,31 +1,31 @@
 package service
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "easyoffer/interview/internal/domain"
-    "easyoffer/interview/internal/repository"
+	"context"
+	"easyoffer/interview/internal/domain"
+	"easyoffer/interview/internal/repository"
+	"errors"
+	"fmt"
 )
 
 func (s *interviewService) getOwnedSession(ctx context.Context, userID, sessionID string) (*domain.InterviewSession, error) {
-    if userID == "" {
-        return nil, ErrMissingUserID
-    }
+	if userID == "" {
+		return nil, ErrMissingUserID
+	}
 
-    session, err := s.repo.Get(ctx, sessionID)
-    if err != nil {
-        if errors.Is(err, repository.ErrSessionNotFound) {
-            return nil, ErrSessionNotFound
-        }
-        return nil, fmt.Errorf("failed to load session: %w", err)
-    }
+	session, err := s.repo.Get(ctx, sessionID)
+	if err != nil {
+		if errors.Is(err, repository.ErrSessionNotFound) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, fmt.Errorf("failed to load session: %w", err)
+	}
 
-    if session.UserID != userID {
-        return nil, ErrSessionForbidden
-    }
+	if session.UserID != userID {
+		return nil, ErrSessionForbidden
+	}
 
-    return session, nil
+	return session, nil
 }
 
 func buildResult(session *domain.InterviewSession) *domain.InterviewResult {
