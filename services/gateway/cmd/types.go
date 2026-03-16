@@ -2,13 +2,7 @@ package main
 
 import "net/http"
 
-// @title EasyOffer Gateway API
-// @version 1.0
-// @description Public API exposed by the Gateway service.
-// @BasePath /
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
+
 
 type gateway struct {
 	client       *http.Client

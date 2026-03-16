@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   main.CreateQuestionRequest:
     properties:
@@ -261,6 +262,9 @@ definitions:
     type: object
 info:
   contact: {}
+  description: Public API exposed by the Gateway service.
+  title: EasyOffer Gateway API
+  version: "1.0"
 paths:
   /api/v1/auth/login:
     post:
@@ -863,4 +867,9 @@ paths:
       summary: Gateway health check
       tags:
       - health
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
