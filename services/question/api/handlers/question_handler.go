@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,17 +43,7 @@ func (h *QuestionHandler) CreateQuestion(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, QuestionResponse{
-		ID:           q.ID,
-		Title:        q.Title,
-		Content:      q.Content,
-		Category:     string(q.Category),
-		AnswerFormat: string(q.AnswerFormat),
-		Language:     q.Language,
-		StarterCode:  q.StarterCode,
-		AuthorID:     q.AuthorID,
-		CreatedAt:    q.CreatedAt.Format(time.RFC3339),
-	})
+	c.JSON(http.StatusCreated, toQuestionResponse(q))
 }
 
 func (h *QuestionHandler) PatchQuestion(c *gin.Context) {
@@ -104,17 +93,7 @@ func (h *QuestionHandler) PatchQuestion(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, QuestionResponse{
-		ID:           q.ID,
-		Title:        q.Title,
-		Content:      q.Content,
-		Category:     string(q.Category),
-		AnswerFormat: string(q.AnswerFormat),
-		Language:     q.Language,
-		StarterCode:  q.StarterCode,
-		AuthorID:     q.AuthorID,
-		CreatedAt:    q.CreatedAt.Format(time.RFC3339),
-	})
+	c.JSON(http.StatusOK, toQuestionResponse(q))
 }
 
 func (h *QuestionHandler) ReviewQuestion(c *gin.Context) {
@@ -147,15 +126,7 @@ func (h *QuestionHandler) ReviewQuestion(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, QuestionReviewResponse{
-		ID:         review.ID,
-		UserID:     review.UserID,
-		QuestionID: review.QuestionID,
-		Status:     string(review.Status),
-		UserAnswer: review.UserAnswer,
-		Note:       review.Note,
-		ReviewedAt: review.ReviewedAt.Format(time.RFC3339),
-	})
+	c.JSON(http.StatusOK, toQuestionReviewResponse(review))
 }
 
 func (h *QuestionHandler) ListQuestions(c *gin.Context) {
@@ -223,23 +194,8 @@ func (h *QuestionHandler) ListQuestions(c *gin.Context) {
 		return
 	}
 
-	response := make([]QuestionResponse, 0, len(questions))
-	for _, q := range questions {
-		response = append(response, QuestionResponse{
-			ID:           q.ID,
-			Title:        q.Title,
-			Content:      q.Content,
-			Category:     string(q.Category),
-			AnswerFormat: string(q.AnswerFormat),
-			Language:     q.Language,
-			StarterCode:  q.StarterCode,
-			AuthorID:     q.AuthorID,
-			CreatedAt:    q.CreatedAt.Format(time.RFC3339),
-		})
-	}
-
 	c.JSON(http.StatusOK, QuestionsListResponse{
-		Questions: response,
+		Questions: toQuestionResponses(questions),
 		Total:     total,
 		Limit:     limit,
 		Offset:    offset,
@@ -264,17 +220,7 @@ func (h *QuestionHandler) GetQuestion(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, QuestionResponse{
-		ID:           q.ID,
-		Title:        q.Title,
-		Content:      q.Content,
-		Category:     string(q.Category),
-		AnswerFormat: string(q.AnswerFormat),
-		Language:     q.Language,
-		StarterCode:  q.StarterCode,
-		AuthorID:     q.AuthorID,
-		CreatedAt:    q.CreatedAt.Format(time.RFC3339),
-	})
+	c.JSON(http.StatusOK, toQuestionResponse(q))
 }
 
 func (h *QuestionHandler) ListMyReviews(c *gin.Context) {
@@ -297,18 +243,7 @@ func (h *QuestionHandler) ListMyReviews(c *gin.Context) {
 		return
 	}
 
-	response := make([]QuestionReviewResponse, 0, len(reviews))
-	for _, r := range reviews {
-		response = append(response, QuestionReviewResponse{
-			ID:         r.ID,
-			UserID:     r.UserID,
-			QuestionID: r.QuestionID,
-			Status:     string(r.Status),
-			UserAnswer: r.UserAnswer,
-			Note:       r.Note,
-			ReviewedAt: r.ReviewedAt.Format(time.RFC3339),
-		})
-	}
+	response := toQuestionReviewResponses(reviews)
 
 	c.JSON(http.StatusOK, ReviewsListResponse{
 		Reviews: response,
@@ -340,15 +275,7 @@ func (h *QuestionHandler) GetMyQuestionReview(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, QuestionReviewResponse{
-		ID:         review.ID,
-		UserID:     review.UserID,
-		QuestionID: review.QuestionID,
-		Status:     string(review.Status),
-		UserAnswer: review.UserAnswer,
-		Note:       review.Note,
-		ReviewedAt: review.ReviewedAt.Format(time.RFC3339),
-	})
+	c.JSON(http.StatusOK, toQuestionReviewResponse(review))
 }
 
 func (h *QuestionHandler) ListMyQuestions(c *gin.Context) {
@@ -394,25 +321,8 @@ func (h *QuestionHandler) ListMyQuestions(c *gin.Context) {
 		return
 	}
 
-	response := make([]MyQuestionResponse, 0, len(questions))
-	for _, q := range questions {
-		response = append(response, MyQuestionResponse{
-			ID:           q.ID,
-			Title:        q.Title,
-			Content:      q.Content,
-			Category:     string(q.Category),
-			AnswerFormat: string(q.AnswerFormat),
-			Language:     q.Language,
-			StarterCode:  q.StarterCode,
-			AuthorID:     q.AuthorID,
-			CreatedAt:    q.CreatedAt.Format(time.RFC3339),
-			ReviewStatus: string(q.ReviewStatus),
-			ReviewedAt:   q.ReviewedAt.Format(time.RFC3339),
-		})
-	}
-
 	c.JSON(http.StatusOK, MyQuestionsListResponse{
-		Questions: response,
+		Questions: toMyQuestionResponses(questions),
 		Total:     total,
 		Limit:     limit,
 		Offset:    offset,

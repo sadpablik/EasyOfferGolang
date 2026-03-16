@@ -6,9 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
-	"easyoffer/interview/internal/domain"
 	"easyoffer/interview/internal/service"
 )
 
@@ -44,11 +42,7 @@ func (h *InterviewHandler) StartInterview(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, StartInterviewResponse{
-		SessionID:     session.ID,
-		Total:         len(session.Questions),
-		FirstQuestion: toQuestionResponse(firstQuestion),
-	})
+	writeJSON(w, http.StatusCreated, toStartInterviewResponse(session, firstQuestion))
 }
 
 func (h *InterviewHandler) NextQuestion(w http.ResponseWriter, r *http.Request) {
@@ -65,10 +59,7 @@ func (h *InterviewHandler) NextQuestion(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, NextQuestionResponse{
-		Done:     !hasMore,
-		Question: toQuestionResponse(question),
-	})
+	writeJSON(w, http.StatusOK, toNextQuestionResponse(question, hasMore))
 }
 
 func (h *InterviewHandler) SubmitAnswer(w http.ResponseWriter, r *http.Request) {
@@ -131,38 +122,4 @@ func (h *InterviewHandler) GetResult(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, toResultResponse(result))
-}
-
-func toQuestionResponse(question *domain.QuestionSnapshot) *InterviewQuestionResponse {
-	if question == nil {
-		return nil
-	}
-
-	return &InterviewQuestionResponse{
-		ID:           question.ID,
-		Title:        question.Title,
-		Content:      question.Content,
-		Category:     question.Category,
-		AnswerFormat: question.AnswerFormat,
-		Language:     question.Language,
-		StarterCode:  question.StarterCode,
-		AuthorID:     question.AuthorID,
-		CreatedAt:    question.CreatedAt,
-	}
-}
-
-func toResultResponse(result *domain.InterviewResult) InterviewResultResponse {
-	if result == nil {
-		return InterviewResultResponse{}
-	}
-
-	return InterviewResultResponse{
-		SessionID:  result.SessionID,
-		Total:      result.Total,
-		Answered:   result.Answered,
-		Know:       result.Know,
-		DontKnow:   result.DontKnow,
-		Repeat:     result.Repeat,
-		FinishedAt: result.FinishedAt.Format(time.RFC3339),
-	}
 }

@@ -65,12 +65,10 @@ type MyQuestionResponse struct {
 
 type MyQuestionsListResponse struct {
 	Questions []MyQuestionResponse `json:"questions"`
-	Total     int64                  `json:"total"`
-	Limit int 		`json:"limit"`
-	Offset int 		`json:"offset"`
+	Total     int64                `json:"total"`
+	Limit     int                  `json:"limit"`
+	Offset    int                  `json:"offset"`
 }
-
-
 
 type ReviewsListResponse struct {
 	Reviews []QuestionReviewResponse `json:"reviews"`
@@ -79,7 +77,7 @@ type ReviewsListResponse struct {
 
 type QuestionsListResponse struct {
 	Questions []QuestionResponse `json:"questions"`
-	Total     int64                `json:"total"`
-	Limit int 		`json:"limit"`
-	Offset int 		`json:"offset"`
+	Total     int64              `json:"total"`
+	Limit     int                `json:"limit"`
+	Offset    int                `json:"offset"`
 }
