@@ -1,46 +1,45 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	"easyoffer/interview/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
-func writeServiceError(w http.ResponseWriter, err error) {
+func writeServiceError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrMissingUserID):
-		writeError(w, http.StatusUnauthorized, "missing X-User-ID header")
+		writeError(c, http.StatusUnauthorized, "missing X-User-ID header")
 	case errors.Is(err, service.ErrInvalidCount):
-		writeError(w, http.StatusBadRequest, "question count must be between 1 and 50")
+		writeError(c, http.StatusBadRequest, "question count must be between 1 and 50")
 	case errors.Is(err, service.ErrInvalidStatus):
-		writeError(w, http.StatusBadRequest, "invalid review status")
+		writeError(c, http.StatusBadRequest, "invalid review status")
 	case errors.Is(err, service.ErrQuestionNotInSession):
-		writeError(w, http.StatusBadRequest, "question does not belong to this session")
+		writeError(c, http.StatusBadRequest, "question does not belong to this session")
 	case errors.Is(err, service.ErrSessionNotFound):
-		writeError(w, http.StatusNotFound, "session not found")
+		writeError(c, http.StatusNotFound, "session not found")
 	case errors.Is(err, service.ErrSessionForbidden):
-		writeError(w, http.StatusForbidden, "access denied")
+		writeError(c, http.StatusForbidden, "access denied")
 	case errors.Is(err, service.ErrSessionFinished):
-		writeError(w, http.StatusConflict, "session is already finished")
+		writeError(c, http.StatusConflict, "session is already finished")
 	case errors.Is(err, service.ErrSessionNotFinished):
-		writeError(w, http.StatusConflict, "session is not finished yet")
+		writeError(c, http.StatusConflict, "session is not finished yet")
 	case errors.Is(err, service.ErrNoQuestionsAvailable):
-		writeError(w, http.StatusUnprocessableEntity, "no questions available for given filters")
+		writeError(c, http.StatusUnprocessableEntity, "no questions available for given filters")
 	case errors.Is(err, service.ErrNotImplemented):
-		writeError(w, http.StatusNotImplemented, "interview service endpoint is not implemented yet")
+		writeError(c, http.StatusNotImplemented, "interview service endpoint is not implemented yet")
 	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		writeError(c, http.StatusInternalServerError, "internal server error")
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, ErrorResponse{Error: message})
+func writeError(c *gin.Context, status int, message string) {
+	c.JSON(status, ErrorResponse{Error: message})
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+func writeJSON(c *gin.Context, status int, payload any) {
+	c.JSON(status, payload)
 }

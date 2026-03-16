@@ -2,15 +2,17 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
+	"time"
+
 	"easyoffer/interview/api/handlers"
 	"easyoffer/interview/internal/client"
 	"easyoffer/interview/internal/config"
 	"easyoffer/interview/internal/repository"
 	"easyoffer/interview/internal/service"
-	"log"
-	"net/http"
-	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -35,21 +37,25 @@ func main() {
 	interviewService := service.NewInterviewService(sessionRepo, questionClient, cfg.SessionTTL)
 	interviewHandler := handlers.NewInterviewHandler(interviewService)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
+
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatal(err)
+	}
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	mux.HandleFunc("POST /interviews/start", interviewHandler.StartInterview)
-	mux.HandleFunc("GET /interviews/{id}/next", interviewHandler.NextQuestion)
-	mux.HandleFunc("POST /interviews/{id}/answer", interviewHandler.SubmitAnswer)
-	mux.HandleFunc("POST /interviews/{id}/finish", interviewHandler.FinishInterview)
-	mux.HandleFunc("GET /interviews/{id}/result", interviewHandler.GetResult)
+	r.POST("/interviews/start", interviewHandler.StartInterview)
+	r.GET("/interviews/:id/next", interviewHandler.NextQuestion)
+	r.POST("/interviews/:id/answer", interviewHandler.SubmitAnswer)
+	r.POST("/interviews/:id/finish", interviewHandler.FinishInterview)
+	r.GET("/interviews/:id/result", interviewHandler.GetResult)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           mux,
+		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
