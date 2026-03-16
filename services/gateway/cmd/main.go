@@ -28,15 +28,21 @@ func main() {
 		log.Fatal("QUESTION_SERVICE_URL is required")
 	}
 
+	interviewURL := strings.TrimRight(strings.TrimSpace(os.Getenv("INTERVIEW_SERVICE_URL")), "/")
+	if interviewURL == "" {
+		log.Fatal("INTERVIEW_SERVICE_URL is required")
+	}
+
 	port := strings.TrimSpace(os.Getenv("GATEWAY_PORT"))
 	if port == "" {
 		port = "8080"
 	}
 
 	g := &gateway{
-		client:      &http.Client{Timeout: 5 * time.Second},
-		authURL:     authURL,
-		questionURL: questionURL,
+		client:       &http.Client{Timeout: 5 * time.Second},
+		authURL:      authURL,
+		questionURL:  questionURL,
+		interviewURL: interviewURL,
 	}
 
 	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
@@ -61,6 +67,11 @@ func main() {
 	protected.GET("/me/reviews", g.listMyReviewsHandler)
 	protected.GET("/me/questions", g.listMyQuestionsHandler)
 	protected.DELETE("/questions/:id", g.deleteQuestionHandler)
+	protected.POST("/interviews/start", g.startInterviewHandler)
+	protected.GET("/interviews/:id/next", g.nextInterviewQuestionHandler)
+	protected.POST("/interviews/:id/answer", g.answerInterviewQuestionHandler)
+	protected.POST("/interviews/:id/finish", g.finishInterviewHandler)
+	protected.GET("/interviews/:id/result", g.interviewResultHandler)
 	r.GET("/health", healthHandler)
 	r.GET("/swagger/*any", gin.WrapH(httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))))
 
@@ -369,6 +380,117 @@ func (g *gateway) deleteQuestionHandler(c *gin.Context) {
 
 	target := g.questionURL + "/questions/" + c.Param("id")
 	g.proxyDelete(c, target, userID)
+}
+
+// @Summary Start interview session
+// @Tags interviews
+// @Accept json
+// @Produce json
+// @Param request body StartInterviewRequest false "Interview filters"
+// @Success 201 {object} StartInterviewResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/start [post]
+func (g *gateway) startInterviewHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	g.proxyPost(c, g.interviewURL+"/interviews/start", userID)
+}
+
+// @Summary Get next interview question
+// @Tags interviews
+// @Produce json
+// @Param id path string true "Interview session ID"
+// @Success 200 {object} NextInterviewQuestionResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/{id}/next [get]
+func (g *gateway) nextInterviewQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.interviewURL + "/interviews/" + c.Param("id") + "/next"
+	g.proxyGet(c, target, userID)
+}
+
+// @Summary Submit answer for interview question
+// @Tags interviews
+// @Accept json
+// @Produce json
+// @Param id path string true "Interview session ID"
+// @Param request body SubmitInterviewAnswerRequest true "Interview answer"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/{id}/answer [post]
+func (g *gateway) answerInterviewQuestionHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.interviewURL + "/interviews/" + c.Param("id") + "/answer"
+	g.proxyPost(c, target, userID)
+}
+
+// @Summary Finish interview session
+// @Tags interviews
+// @Produce json
+// @Param id path string true "Interview session ID"
+// @Success 200 {object} InterviewResultResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/{id}/finish [post]
+func (g *gateway) finishInterviewHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.interviewURL + "/interviews/" + c.Param("id") + "/finish"
+	g.proxyPost(c, target, userID)
+}
+
+// @Summary Get interview result
+// @Tags interviews
+// @Produce json
+// @Param id path string true "Interview session ID"
+// @Success 200 {object} InterviewResultResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/{id}/result [get]
+func (g *gateway) interviewResultHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.interviewURL + "/interviews/" + c.Param("id") + "/result"
+	g.proxyGet(c, target, userID)
 }
 
 // healthHandler returns service liveness status.

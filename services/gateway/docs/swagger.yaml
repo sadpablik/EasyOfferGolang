@@ -24,6 +24,44 @@ definitions:
       status:
         type: string
     type: object
+  main.InterviewQuestionResponse:
+    properties:
+      answer_format:
+        type: string
+      author_id:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      language:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.InterviewResultResponse:
+    properties:
+      answered:
+        type: integer
+      dont_know:
+        type: integer
+      finished_at:
+        type: string
+      know:
+        type: integer
+      repeat:
+        type: integer
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
   main.LoginRequest:
     properties:
       email:
@@ -73,6 +111,13 @@ definitions:
         type: array
       total:
         type: integer
+    type: object
+  main.NextInterviewQuestionResponse:
+    properties:
+      done:
+        type: boolean
+      question:
+        $ref: '#/definitions/main.InterviewQuestionResponse'
     type: object
   main.QuestionResponse:
     properties:
@@ -156,6 +201,37 @@ definitions:
         type: array
       total:
         type: integer
+    type: object
+  main.StartInterviewRequest:
+    properties:
+      answer_format:
+        type: string
+      category:
+        type: string
+      count:
+        type: integer
+      language:
+        type: string
+    type: object
+  main.StartInterviewResponse:
+    properties:
+      first_question:
+        $ref: '#/definitions/main.InterviewQuestionResponse'
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  main.SubmitInterviewAnswerRequest:
+    properties:
+      note:
+        type: string
+      question_id:
+        type: string
+      status:
+        type: string
+      user_answer:
+        type: string
     type: object
   main.UpdateQuestionRequest:
     properties:
@@ -252,6 +328,192 @@ paths:
       summary: Register user
       tags:
       - auth
+  /api/v1/interviews/{id}/answer:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Interview answer
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.SubmitInterviewAnswerRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit answer for interview question
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/finish:
+    post:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.InterviewResultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Finish interview session
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/next:
+    get:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.NextInterviewQuestionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get next interview question
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/result:
+    get:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.InterviewResultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get interview result
+      tags:
+      - interviews
+  /api/v1/interviews/start:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Interview filters
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/main.StartInterviewRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.StartInterviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start interview session
+      tags:
+      - interviews
   /api/v1/me/questions:
     get:
       parameters:

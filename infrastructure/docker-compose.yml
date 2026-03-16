@@ -16,12 +16,18 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-#  redis:
-#    image: redis:7-alpine
-#    ports:
-#      - "6379:6379"
-#    volumes:
-#      - redis_data:/data
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
 
 #  kafka:
 #    image: confluentinc/cp-kafka:7.4.0
@@ -109,16 +115,32 @@ services:
         condition: service_healthy
     restart: "no"
 
-#  interview-service:
-#    build: ../services/interview
-#    ports:
-#      - "8083:8083"
-#    environment:
-#      - REDIS_URL=redis://redis:6379
-#      - KAFKA_BROKERS=kafka:29092
-#    depends_on:
-#      - redis
-#      - kafka
+  interview-service:
+    build: ../services/interview
+    ports:
+      - "8083:8083"
+    environment:
+      - INTERVIEW_SERVICE_PORT=8083
+      - QUESTION_SERVICE_URL=http://question-service:8082
+      - REDIS_ADDR=redis:6379
+      - REDIS_DB=0
+    depends_on:
+      question-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  gateway-swagger:
+    image: golang:latest
+    working_dir: /app
+    volumes:
+      - ../services/gateway:/app
+    command:
+      - /bin/sh
+      - -c
+      - rm -rf docs && go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/main.go -o docs --parseInternal
+    profiles:
+      - tools
 
   gateway:
     build: ../services/gateway
@@ -127,11 +149,12 @@ services:
     environment:
       - AUTH_SERVICE_URL=http://auth-service:8081
       - QUESTION_SERVICE_URL=http://question-service:8082
+      - INTERVIEW_SERVICE_URL=http://interview-service:8083
       - JWT_SECRET=your-secret-key
     depends_on:
       - auth-service
       - question-service
-      # - interview-service
+      - interview-service
 
 #  prometheus:
 #    image: prom/prometheus
@@ -153,5 +176,5 @@ services:
 
 volumes:
   postgres_data:
-#  redis_data:
+  redis_data:
 #  grafana_data:
