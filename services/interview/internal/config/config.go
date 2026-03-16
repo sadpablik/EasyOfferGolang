@@ -14,6 +14,10 @@ type Config struct {
 	RedisPassword      string
 	RedisDB            int
 	SessionTTL         time.Duration
+	KafkaEnabled       bool
+	KafkaBrokers       string
+	KafkaTopic         string
+	KafkaConsumerGroup string
 }
 
 func Load() Config {
@@ -41,6 +45,10 @@ func Load() Config {
 		RedisPassword:      strings.TrimSpace(os.Getenv("REDIS_PASSWORD")),
 		RedisDB:            parseIntEnv("REDIS_DB", 0),
 		SessionTTL:         time.Duration(sessionTTLSeconds) * time.Second,
+		KafkaEnabled: getEnvBool("KAFKA_ENABLED", false),
+		KafkaBrokers: getEnv("KAFKA_BROKERS", "kafka:29092"),
+		KafkaTopic:   getEnv("KAFKA_TOPIC_QUESTIONS", "questions.events"),
+		KafkaConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "interview-service"),
 	}
 }
 
@@ -55,5 +63,26 @@ func parseIntEnv(name string, fallback int) int {
 		return fallback
 	}
 
+	return value
+}
+
+func getEnv(key, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
 	return value
 }

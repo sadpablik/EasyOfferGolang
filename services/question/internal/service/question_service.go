@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"easyoffer/question/internal/domain"
+	"easyoffer/question/internal/events"
 	"easyoffer/question/internal/repository"
 	"errors"
 	"strings"
@@ -38,11 +40,15 @@ type QuestionService interface {
 }
 
 type questionService struct {
-	repo repository.QuestionRepository
+	repo      repository.QuestionRepository
+	publisher events.Publisher
 }
 
-func NewQuestionService(repo repository.QuestionRepository) QuestionService {
-	return &questionService{repo: repo}
+func NewQuestionService(repo repository.QuestionRepository, publisher events.Publisher) QuestionService {
+	return &questionService{
+		repo:      repo,
+		publisher: publisher,
+	}
 }
 
 func (s *questionService) CreateQuestion(title, content, authorID, category, answerFormat, language, starterCode string) (*domain.Question, error) {
@@ -78,6 +84,8 @@ func (s *questionService) CreateQuestion(title, content, authorID, category, ans
 		}
 		return nil, err
 	}
+
+	_ = s.publisher.PublishQuestionCreated(context.Background(), q)
 	return q, nil
 }
 
@@ -141,6 +149,8 @@ func (s *questionService) PatchQuestion(questionID, userID string, title, conten
 	if err := s.repo.Update(q); err != nil {
 		return nil, err
 	}
+
+	_ = s.publisher.PublishQuestionUpdated(context.Background(), q)
 
 	return q, nil
 }
@@ -314,6 +324,9 @@ func (s *questionService) Delete(questionID, userID string) error {
 	err = s.repo.Delete(strings.TrimSpace(questionID))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrQuestionNotFound
+	}
+	if err == nil {
+		_ = s.publisher.PublishQuestionDeleted(context.Background(), q.ID)
 	}
 	return err
 }

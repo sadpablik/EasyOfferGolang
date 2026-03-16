@@ -3,6 +3,7 @@ package main
 import (
 	"easyoffer/question/api/handlers"
 	"easyoffer/question/internal/config"
+	"easyoffer/question/internal/events"
 	"easyoffer/question/internal/repository"
 	"easyoffer/question/internal/service"
 	"log"
@@ -24,7 +25,15 @@ func main() {
 	}
 
 	questionRepo := repository.NewQuestionRepository(db)
-	questionService := service.NewQuestionService(questionRepo)
+	publisher := events.NewNoopPublisher()
+	if cfg.KafkaEnabled {
+		publisher, err = events.NewKafkaPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
+		if err != nil {
+			log.Fatal("failed to initialize kafka publisher:", err)
+		}
+	}
+
+	questionService := service.NewQuestionService(questionRepo, publisher)
 	questionHandler := handlers.NewQuestionHandler(questionService)
 
 	g := gin.New()
