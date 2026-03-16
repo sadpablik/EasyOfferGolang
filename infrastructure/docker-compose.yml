@@ -93,7 +93,9 @@ services:
       - DB_USER=user
       - DB_PASSWORD=password
       - DB_NAME=easyoffer
-      - KAFKA_BROKERS=localhost:9092
+      - KAFKA_ENABLED=true
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_QUESTIONS=questions.events
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,6 +126,10 @@ services:
       - QUESTION_SERVICE_URL=http://question-service:8082
       - REDIS_ADDR=redis:6379
       - REDIS_DB=0
+      - KAFKA_ENABLED=true
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_QUESTIONS=questions.events
+      - KAFKA_CONSUMER_GROUP=interview-service
     depends_on:
       question-service:
         condition: service_started

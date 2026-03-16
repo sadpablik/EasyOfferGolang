@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"easyoffer/interview/api/handlers"
-	"easyoffer/interview/internal/client"
 	"easyoffer/interview/internal/config"
+	"easyoffer/interview/internal/consumer"
 	"easyoffer/interview/internal/repository"
 	"easyoffer/interview/internal/service"
 
@@ -33,8 +33,26 @@ func main() {
 	}
 
 	sessionRepo := repository.NewRedisSessionRepository(redisClient, cfg.SessionTTL)
-	questionClient := client.NewHTTPQuestionClient(cfg.QuestionServiceURL, 5*time.Second)
-	interviewService := service.NewInterviewService(sessionRepo, questionClient, cfg.SessionTTL)
+	questionRepo := repository.NewRedisQuestionRepository(redisClient)
+
+	if cfg.KafkaEnabled {
+		questionConsumer, err := consumer.NewQuestionConsumer(
+			cfg.KafkaBrokers,
+			cfg.KafkaTopic,
+			cfg.KafkaConsumerGroup,
+			questionRepo,
+		)
+		if err != nil {
+			log.Fatal("failed to initialize question consumer: ", err)
+		}
+		go func() {
+			if err := questionConsumer.Run(context.Background()); err != nil {
+				log.Printf("question consumer stopped: %v", err)
+			}
+		}()
+	}
+
+	interviewService := service.NewInterviewService(sessionRepo, questionRepo, cfg.SessionTTL)
 	interviewHandler := handlers.NewInterviewHandler(interviewService)
 
 	r := gin.New()

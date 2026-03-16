@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"easyoffer/interview/internal/client"
 	"easyoffer/interview/internal/domain"
 	"easyoffer/interview/internal/repository"
 
@@ -50,18 +49,18 @@ type InterviewService interface {
 
 type interviewService struct {
 	repo       repository.SessionRepository
-	client     client.QuestionClient
+	questions  repository.QuestionRepository
 	sessionTTL time.Duration
 }
 
 func NewInterviewService(
 	repo repository.SessionRepository,
-	qClient client.QuestionClient,
+	questions repository.QuestionRepository,
 	sessionTTL time.Duration,
 ) InterviewService {
 	return &interviewService{
 		repo:       repo,
-		client:     qClient,
+		questions:  questions,
 		sessionTTL: sessionTTL,
 	}
 }
@@ -77,8 +76,7 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 	if count > 50 {
 		return nil, nil, ErrInvalidCount
 	}
-	questions, err := s.client.ListQuestions(ctx, client.ListQuestionsParams{
-		UserID:       userID,
+	questions, err := s.questions.List(ctx, repository.QuestionFilter{
 		Category:     input.Category,
 		AnswerFormat: input.AnswerFormat,
 		Language:     input.Language,

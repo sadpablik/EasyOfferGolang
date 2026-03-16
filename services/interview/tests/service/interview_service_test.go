@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"easyoffer/interview/internal/client"
 	"easyoffer/interview/internal/domain"
 	"easyoffer/interview/internal/repository"
 	interviewservice "easyoffer/interview/internal/service"
@@ -44,9 +43,17 @@ func (s *sessionRepositoryStub) Delete(_ context.Context, _ string) error {
 	return nil
 }
 
-type questionClientStub struct{}
+type questionRepositoryStub struct{}
 
-func (q *questionClientStub) ListQuestions(_ context.Context, _ client.ListQuestionsParams) ([]domain.QuestionSnapshot, error) {
+func (q *questionRepositoryStub) Upsert(_ context.Context, _ *domain.QuestionSnapshot) error {
+	return nil
+}
+
+func (q *questionRepositoryStub) DeleteQuestion(_ context.Context, _ string) error {
+	return nil
+}
+
+func (q *questionRepositoryStub) List(_ context.Context, _ repository.QuestionFilter) ([]domain.QuestionSnapshot, error) {
 	return nil, nil
 }
 
@@ -65,7 +72,7 @@ func TestGetNextQuestion_WhenAllQuestionsAnswered_ReturnsDoneStateWithoutError(t
 		},
 	}
 
-	svc := interviewservice.NewInterviewService(repo, &questionClientStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
 
 	question, hasMore, err := svc.GetNextQuestion(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -84,7 +91,7 @@ func TestGetNextQuestion_WhenAllQuestionsAnswered_ReturnsDoneStateWithoutError(t
 
 func TestSubmitAnswer_InvalidStatus_ReturnsErrInvalidStatus(t *testing.T) {
 	repo := &sessionRepositoryStub{}
-	svc := interviewservice.NewInterviewService(repo, &questionClientStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
 
 	err := svc.SubmitAnswer(context.Background(), "user-1", "session-1", interviewservice.SubmitAnswerInput{
 		QuestionID: "q-1",
@@ -114,7 +121,7 @@ func TestGetResult_BeforeFinish_ReturnsErrSessionNotFinished(t *testing.T) {
 		},
 	}
 
-	svc := interviewservice.NewInterviewService(repo, &questionClientStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
 
 	result, err := svc.GetResult(context.Background(), "user-1", "session-1")
 	if !errors.Is(err, interviewservice.ErrSessionNotFinished) {
