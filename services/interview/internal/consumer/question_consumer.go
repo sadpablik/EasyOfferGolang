@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"easyoffer/interview/internal/repository"
 
@@ -16,6 +17,8 @@ type QuestionConsumer struct {
 	reader *kafka.Reader
 	repo   repository.QuestionRepository
 }
+
+const processedEventTTL = 24 * time.Hour
 
 func NewQuestionConsumer(brokers, topic, groupID string, repo repository.QuestionRepository) (*QuestionConsumer, error) {
 	brokers = strings.TrimSpace(brokers)
@@ -62,7 +65,7 @@ func (c *QuestionConsumer) Run(ctx context.Context) error {
 			return err
 		}
 
-		if err := c.handleMessage(ctx, msg.Value); err != nil {
+		if err := c.handleMessage(ctx, msg); err != nil {
 			log.Printf("failed to handle question event topic=%s partition=%d offset=%d: %v",
 				msg.Topic, msg.Partition, msg.Offset, err)
 			continue
@@ -78,20 +81,46 @@ func (c *QuestionConsumer) Close() error {
 	return c.reader.Close()
 }
 
-func (c *QuestionConsumer) handleMessage(ctx context.Context, data []byte) error {
+func (c *QuestionConsumer) handleMessage(ctx context.Context, msg kafka.Message) error {
 	var event QuestionEvent
 
-	if err := json.Unmarshal(data, &event); err != nil {
+	if err := json.Unmarshal(msg.Value, &event); err != nil {
 		return err
 	}
 
+	if event.EventID != "" {
+		if dedupStore, ok := c.repo.(repository.EventDedupStore); ok {
+			firstSeen, err := dedupStore.MarkEventProcessed(ctx, event.EventID, processedEventTTL)
+			if err != nil {
+				return err
+			}
+			if !firstSeen {
+				log.Printf("skip duplicate question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
+					event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
+				return nil
+			}
+		}
+	}
+
+	var applyErr error
+
 	switch event.EventType {
 	case EventQuestionCreated, EventQuestionUpdated:
-		return c.repo.Upsert(ctx, event.Payload.ToSnapshot())
+		applyErr = c.repo.Upsert(ctx, event.Payload.ToSnapshot())
 	case EventQuestionDeleted:
-		return c.repo.DeleteQuestion(ctx, event.Payload.QuestionID)
+		applyErr = c.repo.DeleteQuestion(ctx, event.Payload.QuestionID)
 	default:
-		log.Printf("skip unknown question event type=%s", event.EventType)
+		log.Printf("skip unknown question event type=%s key=%s topic=%s partition=%d offset=%d",
+			event.EventType, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
 		return nil
 	}
+
+	if applyErr != nil {
+		return applyErr
+	}
+
+	log.Printf("processed question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
+		event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
+
+	return nil
 }

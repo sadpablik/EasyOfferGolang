@@ -16,11 +16,35 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+)
+
+var gatewayHTTPRequestsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Namespace: "easyoffer",
+		Subsystem: "gateway",
+		Name:      "http_requests_total",
+		Help:      "Total number of HTTP requests.",
+	},
+	[]string{"method", "route", "status"},
+)
+
+var gatewayHTTPRequestDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "easyoffer",
+		Subsystem: "gateway",
+		Name:      "http_request_duration_seconds",
+		Help:      "HTTP request duration in seconds.",
+		Buckets:   prometheus.DefBuckets,
+	},
+	[]string{"method", "route", "status"},
 )
 
 func main() {
@@ -59,6 +83,8 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	prometheus.MustRegister(gatewayHTTPRequestsTotal, gatewayHTTPRequestDuration)
+	r.Use(gatewayMetricsMiddleware())
 
 	r.POST("/api/v1/auth/register", g.registerHandler)
 	r.POST("/api/v1/auth/login", g.loginHandler)
@@ -80,6 +106,7 @@ func main() {
 	protected.POST("/interviews/:id/finish", g.finishInterviewHandler)
 	protected.GET("/interviews/:id/result", g.interviewResultHandler)
 	r.GET("/health", healthHandler)
+	r.GET("/metrics", g.metricsHandler)
 	r.GET("/swagger/*any", gin.WrapH(httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))))
 
 	server := &http.Server{
@@ -93,6 +120,39 @@ func main() {
 
 	log.Printf("gateway starting on :%s", port)
 	log.Fatal(server.ListenAndServe())
+}
+
+// metricsHandler returns Prometheus metrics for scraping.
+// @Summary Gateway metrics
+// @Description Prometheus metrics endpoint for monitoring systems.
+// @Tags observability
+// @Produce plain
+// @Success 200 {string} string "Prometheus metrics"
+// @Router /metrics [get]
+func (g *gateway) metricsHandler(c *gin.Context) {
+	promhttp.Handler().ServeHTTP(c.Writer, c.Request)
+}
+
+func gatewayMetricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		route := c.FullPath()
+		if route == "" {
+			route = "unknown"
+		}
+		if route == "/metrics" {
+			return
+		}
+
+		status := strconv.Itoa(c.Writer.Status())
+		method := c.Request.Method
+		duration := time.Since(start).Seconds()
+
+		gatewayHTTPRequestsTotal.WithLabelValues(method, route, status).Inc()
+		gatewayHTTPRequestDuration.WithLabelValues(method, route, status).Observe(duration)
+	}
 }
 
 // registerHandler proxies registration requests to Auth Service.

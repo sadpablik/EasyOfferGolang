@@ -16,6 +16,21 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  postgres-db-init:
+    image: postgres:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=password
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        psql -h postgres -U user -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='easyoffer_auth'" | grep -q 1 || psql -h postgres -U user -d postgres -c "CREATE DATABASE easyoffer_auth"
+        psql -h postgres -U user -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='easyoffer_question'" | grep -q 1 || psql -h postgres -U user -d postgres -c "CREATE DATABASE easyoffer_question"
+    restart: "no"
+
   redis:
     image: redis:7-alpine
     healthcheck:
@@ -59,7 +74,7 @@ services:
       - DB_PORT=5432
       - DB_USER=user
       - DB_PASSWORD=password
-      - DB_NAME=easyoffer
+      - DB_NAME=easyoffer_auth
       - JWT_SECRET=your-secret-key
     depends_on:
       postgres:
@@ -73,13 +88,15 @@ services:
       - "-path"
       - "/migrations"
       - "-database"
-      - "postgres://user:password@postgres:5432/easyoffer?sslmode=disable&x-migrations-table=schema_migrations_auth"
+      - "postgres://user:password@postgres:5432/easyoffer_auth?sslmode=disable&x-migrations-table=schema_migrations_auth"
       - "up"
     volumes:
       - ../services/auth/migrations:/migrations:ro
     depends_on:
       postgres:
         condition: service_healthy
+      postgres-db-init:
+        condition: service_completed_successfully
     restart: "no"
 
   question-service:
@@ -92,7 +109,7 @@ services:
       - DB_PORT=5432
       - DB_USER=user
       - DB_PASSWORD=password
-      - DB_NAME=easyoffer
+      - DB_NAME=easyoffer_question
       - KAFKA_ENABLED=true
       - KAFKA_BROKERS=kafka:29092
       - KAFKA_TOPIC_QUESTIONS=questions.events
@@ -108,13 +125,15 @@ services:
       - "-path"
       - "/migrations"
       - "-database"
-      - "postgres://user:password@postgres:5432/easyoffer?sslmode=disable&x-migrations-table=schema_migrations_question"
+      - "postgres://user:password@postgres:5432/easyoffer_question?sslmode=disable&x-migrations-table=schema_migrations_question"
       - "up"
     volumes:
       - ../services/question/migrations:/migrations:ro
     depends_on:
       postgres:
         condition: service_healthy
+      postgres-db-init:
+        condition: service_completed_successfully
     restart: "no"
 
   interview-service:
@@ -162,25 +181,25 @@ services:
       - question-service
       - interview-service
 
-#  prometheus:
-#    image: prom/prometheus
-#    ports:
-#      - "9090:9090"
-#    volumes:
-#      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-#    command:
-#      - '--config.file=/etc/prometheus/prometheus.yml'
+  prometheus:
+   image: prom/prometheus
+   ports:
+     - "9090:9090"
+   volumes:
+     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+   command:
+     - '--config.file=/etc/prometheus/prometheus.yml'
 
-#  grafana:
-#    image: grafana/grafana
-#    ports:
-#      - "3000:3000"
-#    environment:
-#      - GF_SECURITY_ADMIN_PASSWORD=admin
-#    volumes:
-#      - grafana_data:/var/lib/grafana
+  grafana:
+   image: grafana/grafana
+   ports:
+     - "3000:3000"
+   environment:
+     - GF_SECURITY_ADMIN_PASSWORD=admin
+   volumes:
+     - grafana_data:/var/lib/grafana
 
 volumes:
   postgres_data:
   redis_data:
-#  grafana_data:
+  grafana_data:

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"easyoffer/interview/internal/domain"
 
@@ -15,6 +16,7 @@ import (
 var (
 	ErrInvalidQuestionSnapshot = errors.New("invalid question snapshot")
 	ErrInvalidQuestionID       = errors.New("invalid question id")
+	ErrInvalidEventID          = errors.New("invalid event id")
 )
 
 type QuestionFilter struct {
@@ -30,9 +32,14 @@ type QuestionRepository interface {
 	List(ctx context.Context, filter QuestionFilter) ([]domain.QuestionSnapshot, error)
 }
 
+type EventDedupStore interface {
+	MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) (bool, error)
+}
+
 const (
-	questionKeyPrefix = "interview:questions:"
-	questionIndexKey  = "interview:questions:index"
+	questionKeyPrefix       = "interview:questions:"
+	questionIndexKey        = "interview:questions:index"
+	processedEventKeyPrefix = "interview:questions:events:processed:"
 )
 
 type redisQuestionRepository struct {
@@ -71,6 +78,23 @@ func (r *redisQuestionRepository) DeleteQuestion(ctx context.Context, questionID
 	pipe.SRem(ctx, questionIndexKey, id)
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+func (r *redisQuestionRepository) MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) (bool, error) {
+	id := strings.TrimSpace(eventID)
+	if id == "" {
+		return false, ErrInvalidEventID
+	}
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+
+	created, err := r.client.SetNX(ctx, processedEventKey(id), "1", ttl).Result()
+	if err != nil {
+		return false, err
+	}
+
+	return created, nil
 }
 
 func (r *redisQuestionRepository) List(ctx context.Context, filter QuestionFilter) ([]domain.QuestionSnapshot, error) {
@@ -114,6 +138,10 @@ func (r *redisQuestionRepository) List(ctx context.Context, filter QuestionFilte
 
 func questionKey(questionID string) string {
 	return questionKeyPrefix + questionID
+}
+
+func processedEventKey(eventID string) string {
+	return processedEventKeyPrefix + eventID
 }
 
 func matchesQuestionFilter(question domain.QuestionSnapshot, filter QuestionFilter) bool {

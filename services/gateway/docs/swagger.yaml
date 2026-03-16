@@ -867,6 +867,19 @@ paths:
       summary: Gateway health check
       tags:
       - health
+  /metrics:
+    get:
+      description: Prometheus metrics endpoint for monitoring systems.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus metrics
+          schema:
+            type: string
+      summary: Gateway metrics
+      tags:
+      - observability
 securityDefinitions:
   BearerAuth:
     in: header

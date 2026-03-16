@@ -963,6 +963,26 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/metrics": {
+            "get": {
+                "description": "Prometheus metrics endpoint for monitoring systems.",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "summary": "Gateway metrics",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
