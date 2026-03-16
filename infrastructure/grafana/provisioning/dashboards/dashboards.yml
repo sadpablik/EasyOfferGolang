@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: EasyOffer Dashboards
+    orgId: 1
+    folder: EasyOffer
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards
