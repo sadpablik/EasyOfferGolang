@@ -33,6 +33,8 @@ func (h *QuestionHandler) CreateQuestion(c *gin.Context) {
 	q, err := h.questionService.CreateQuestion(req.Title, req.Content, authorID, req.Category, req.AnswerFormat, req.Language, req.StarterCode)
 	if err != nil {
 		switch err {
+		case service.ErrQuestionAlreadyExists:
+			c.JSON(http.StatusConflict, ErrorResponse{Error: "question already exists"})
 		case service.ErrInvalidCategory:
 			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid category, must be: resume, theory, practice"})
 		case service.ErrInvalidAnswerFormat:

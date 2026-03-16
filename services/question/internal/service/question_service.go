@@ -14,6 +14,7 @@ import (
 var (
 	ErrInvalidCategory         = errors.New("invalid category")
 	ErrInvalidAnswerFormat     = errors.New("invalid answer format")
+	ErrQuestionAlreadyExists   = errors.New("question already exists")
 	ErrInvalidReviewStatus     = errors.New("invalid review status")
 	ErrInvalidQuestionFilter   = errors.New("invalid question filter")
 	ErrMissingUserID           = errors.New("missing user id")
@@ -72,6 +73,9 @@ func (s *questionService) CreateQuestion(title, content, authorID, category, ans
 	}
 
 	if err := s.repo.Create(q); err != nil {
+		if errors.Is(err, repository.ErrQuestionAlreadyExists) {
+			return nil, ErrQuestionAlreadyExists
+		}
 		return nil, err
 	}
 	return q, nil

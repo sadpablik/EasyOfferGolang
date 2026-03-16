@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrQuestionAlreadyExists = errors.New("question already exists")
+
 type QuestionRepository interface {
 	Create(question *domain.Question) error
 	Update(question *domain.Question) error
@@ -28,7 +30,11 @@ func NewQuestionRepository(db *gorm.DB) QuestionRepository {
 }
 
 func (r *questionRepository) Create(question *domain.Question) error {
-	return r.db.Create(question).Error
+	err := r.db.Create(question).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrQuestionAlreadyExists
+	}
+	return err
 }
 
 func (r *questionRepository) Update(question *domain.Question) error {
