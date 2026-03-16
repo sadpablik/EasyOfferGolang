@@ -57,6 +57,7 @@ func (r *redisQuestionRepository) Upsert(ctx context.Context, question *domain.Q
 
 	payload, err := json.Marshal(question)
 	if err != nil {
+		observeRedis("question_upsert", "error")
 		return err
 	}
 
@@ -64,7 +65,13 @@ func (r *redisQuestionRepository) Upsert(ctx context.Context, question *domain.Q
 	pipe.Set(ctx, questionKey(question.ID), payload, 0)
 	pipe.SAdd(ctx, questionIndexKey, question.ID)
 	_, err = pipe.Exec(ctx)
-	return err
+	if err != nil {
+		observeRedis("question_upsert", "error")
+		return err
+	}
+
+	observeRedis("question_upsert", "success")
+	return nil
 }
 
 func (r *redisQuestionRepository) DeleteQuestion(ctx context.Context, questionID string) error {
@@ -77,7 +84,13 @@ func (r *redisQuestionRepository) DeleteQuestion(ctx context.Context, questionID
 	pipe.Del(ctx, questionKey(id))
 	pipe.SRem(ctx, questionIndexKey, id)
 	_, err := pipe.Exec(ctx)
-	return err
+	if err != nil {
+		observeRedis("question_delete", "error")
+		return err
+	}
+
+	observeRedis("question_delete", "success")
+	return nil
 }
 
 func (r *redisQuestionRepository) MarkEventProcessed(ctx context.Context, eventID string, ttl time.Duration) (bool, error) {
@@ -91,7 +104,15 @@ func (r *redisQuestionRepository) MarkEventProcessed(ctx context.Context, eventI
 
 	created, err := r.client.SetNX(ctx, processedEventKey(id), "1", ttl).Result()
 	if err != nil {
+		observeRedis("event_dedup", "error")
 		return false, err
+	}
+
+	// miss: ключа не было (первое событие), hit: ключ уже существовал (дубликат).
+	if created {
+		observeRedis("event_dedup", "miss")
+	} else {
+		observeRedis("event_dedup", "hit")
 	}
 
 	return created, nil
@@ -100,23 +121,33 @@ func (r *redisQuestionRepository) MarkEventProcessed(ctx context.Context, eventI
 func (r *redisQuestionRepository) List(ctx context.Context, filter QuestionFilter) ([]domain.QuestionSnapshot, error) {
 	ids, err := r.client.SMembers(ctx, questionIndexKey).Result()
 	if err != nil {
+		observeRedis("question_index_members", "error")
 		return nil, err
+	}
+	if len(ids) == 0 {
+		observeRedis("question_index_members", "miss")
+	} else {
+		observeRedis("question_index_members", "hit")
 	}
 
 	questions := make([]domain.QuestionSnapshot, 0, len(ids))
 	for _, id := range ids {
 		payload, err := r.client.Get(ctx, questionKey(id)).Bytes()
 		if errors.Is(err, redis.Nil) {
+			observeRedis("question_get", "miss")
 			continue
 		}
 		if err != nil {
+			observeRedis("question_get", "error")
 			return nil, err
 		}
 
 		var question domain.QuestionSnapshot
 		if err := json.Unmarshal(payload, &question); err != nil {
+			observeRedis("question_get", "error")
 			return nil, err
 		}
+		observeRedis("question_get", "hit")
 
 		if !matchesQuestionFilter(question, filter) {
 			continue
@@ -135,7 +166,6 @@ func (r *redisQuestionRepository) List(ctx context.Context, filter QuestionFilte
 
 	return questions, nil
 }
-
 func questionKey(questionID string) string {
 	return questionKeyPrefix + questionID
 }

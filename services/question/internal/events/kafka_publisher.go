@@ -85,12 +85,16 @@ func (p *KafkaPublisher) publish(ctx context.Context, eventType string, payload 
 	if err != nil {
 		return err
 	}
+
 	if strings.TrimSpace(key) == "" {
 		key = event.EventID
 	}
-	return p.writer.WriteMessages(ctx, kafka.Message{
+
+	err = p.writer.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(key),
 		Value: data,
 		Time:  event.OccurredAt,
 	})
+	ObservePublish(eventType, err)
+	return err
 }

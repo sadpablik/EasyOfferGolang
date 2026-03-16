@@ -87,7 +87,7 @@ func main() {
 	g.Use(gin.Logger(), gin.Recovery())
 	prometheus.MustRegister(questionHTTPRequestsTotal, questionHTTPRequestDuration)
 	g.Use(questionMetricsMiddleware())
-
+	events.RegisterMetrics(prometheus.DefaultRegisterer)
 	if cfg.TrustedProxies == "" {
 		if err := g.SetTrustedProxies(nil); err != nil {
 			log.Fatal(err)
