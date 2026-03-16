@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -50,6 +51,7 @@ type InterviewService interface {
 type interviewService struct {
 	repo       repository.SessionRepository
 	questions  repository.QuestionRepository
+	events     repository.EventStore
 	sessionTTL time.Duration
 }
 
@@ -58,9 +60,23 @@ func NewInterviewService(
 	questions repository.QuestionRepository,
 	sessionTTL time.Duration,
 ) InterviewService {
+	return NewInterviewServiceWithEventStore(repo, questions, repository.NewNoopEventStore(), sessionTTL)
+}
+
+func NewInterviewServiceWithEventStore(
+	repo repository.SessionRepository,
+	questions repository.QuestionRepository,
+	events repository.EventStore,
+	sessionTTL time.Duration,
+) InterviewService {
+	if events == nil {
+		events = repository.NewNoopEventStore()
+	}
+
 	return &interviewService{
 		repo:       repo,
 		questions:  questions,
+		events:     events,
 		sessionTTL: sessionTTL,
 	}
 }
@@ -88,6 +104,7 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 	if len(questions) == 0 {
 		return nil, nil, ErrNoQuestionsAvailable
 	}
+	startedAt := time.Now().UTC()
 
 	session := &domain.InterviewSession{
 		ID:           uuid.NewString(),
@@ -95,7 +112,18 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 		Questions:    questions,
 		CurrentIndex: 0,
 		Answers:      make(map[string]domain.SessionAnswer),
-		StartedAt:    time.Now().UTC(),
+		StartedAt:    startedAt,
+	}
+
+	if err := s.appendEvent(ctx, session.ID, userID, domain.EventSessionStarted, domain.SessionStartedPayload{
+		Category:       input.Category,
+		AnswerFormat:   input.AnswerFormat,
+		Language:       input.Language,
+		RequestedCount: count,
+		Questions:      session.Questions,
+		StartedAt:      startedAt,
+	}); err != nil {
+		return nil, nil, fmt.Errorf("failed to append session started event: %w", err)
 	}
 
 	if err := s.repo.Save(ctx, session); err != nil {
@@ -153,13 +181,24 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 	if !belongs {
 		return ErrQuestionNotInSession
 	}
+	answeredAt := time.Now().UTC()
+
+	if err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
+		QuestionID: input.QuestionID,
+		Status:     status,
+		UserAnswer: input.UserAnswer,
+		Note:       input.Note,
+		AnsweredAt: answeredAt,
+	}); err != nil {
+		return fmt.Errorf("failed to append answer submitted event: %w", err)
+	}
 
 	session.Answers[input.QuestionID] = domain.SessionAnswer{
 		QuestionID: input.QuestionID,
 		Status:     status,
 		UserAnswer: input.UserAnswer,
 		Note:       input.Note,
-		AnsweredAt: time.Now().UTC(),
+		AnsweredAt: answeredAt,
 	}
 
 	if err := s.repo.Save(ctx, session); err != nil {
@@ -178,6 +217,12 @@ func (s *interviewService) FinishSession(ctx context.Context, userID, sessionID 
 	}
 
 	now := time.Now().UTC()
+	if err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventSessionFinished, domain.SessionFinishedPayload{
+		FinishedAt: now,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to append session finished event: %w", err)
+	}
+
 	session.FinishedAt = &now
 
 	if err := s.repo.Save(ctx, session); err != nil {
@@ -186,6 +231,25 @@ func (s *interviewService) FinishSession(ctx context.Context, userID, sessionID 
 
 	result := buildResult(session)
 	return result, nil
+}
+
+func (s *interviewService) appendEvent(ctx context.Context, sessionID, userID string, eventType domain.InterviewEventType, payload interface{}) error {
+	rawPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	event := &domain.InterviewEvent{
+		ID:         uuid.NewString(),
+		SessionID:  sessionID,
+		UserID:     userID,
+		Type:       eventType,
+		OccurredAt: time.Now().UTC(),
+		Version:    1,
+		Payload:    rawPayload,
+	}
+
+	return s.events.Append(ctx, event)
 }
 
 func (s *interviewService) GetResult(ctx context.Context, userID, sessionID string) (*domain.InterviewResult, error) {

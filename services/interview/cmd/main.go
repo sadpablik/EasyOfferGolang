@@ -62,6 +62,7 @@ func main() {
 
 	sessionRepo := repository.NewRedisSessionRepository(redisClient, cfg.SessionTTL)
 	questionRepo := repository.NewRedisQuestionRepository(redisClient)
+	eventStore := repository.NewRedisEventStore(redisClient)
 	var questionConsumer *consumer.QuestionConsumer
 
 	if cfg.KafkaEnabled {
@@ -83,7 +84,7 @@ func main() {
 		}()
 	}
 
-	interviewService := service.NewInterviewService(sessionRepo, questionRepo, cfg.SessionTTL)
+	interviewService := service.NewInterviewServiceWithEventStore(sessionRepo, questionRepo, eventStore, cfg.SessionTTL)
 	interviewHandler := handlers.NewInterviewHandler(interviewService)
 
 	r := gin.New()

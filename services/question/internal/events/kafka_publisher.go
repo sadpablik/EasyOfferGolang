@@ -17,7 +17,7 @@ type KafkaPublisher struct {
 	writer *kafka.Writer
 }
 
-func NewKafkaPublisher(brokers, topic string) (Publisher, error) {
+func NewKafkaPublisher(brokers, topic string) (*KafkaPublisher, error) {
 	brokers = strings.TrimSpace(brokers)
 	topic = strings.TrimSpace(topic)
 
@@ -94,6 +94,23 @@ func (p *KafkaPublisher) publish(ctx context.Context, eventType string, payload 
 		Key:   []byte(key),
 		Value: data,
 		Time:  event.OccurredAt,
+	})
+	ObservePublish(eventType, err)
+	return err
+}
+
+func (p *KafkaPublisher) PublishOutboxEvent(ctx context.Context, eventType, key string, payload []byte) error {
+	if len(payload) == 0 {
+		return errors.New("event payload is empty")
+	}
+	if strings.TrimSpace(key) == "" {
+		key = uuid.NewString()
+	}
+
+	err := p.writer.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(key),
+		Value: payload,
+		Time:  time.Now().UTC(),
 	})
 	ObservePublish(eventType, err)
 	return err

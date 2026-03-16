@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"easyoffer/question/internal/domain"
-	"easyoffer/question/internal/events"
 	"easyoffer/question/internal/repository"
 	questionservice "easyoffer/question/internal/service"
 )
@@ -53,7 +52,6 @@ func (s *questionRepositoryStub) GetMyQuestions(_, _, _ string, _, _ int) ([]*do
 func TestCreateQuestion_MapsDuplicateToServiceError(t *testing.T) {
 	svc := questionservice.NewQuestionService(
 		&questionRepositoryStub{createErr: repository.ErrQuestionAlreadyExists},
-		events.NewNoopPublisher(),
 	)
 
 	question, err := svc.CreateQuestion(

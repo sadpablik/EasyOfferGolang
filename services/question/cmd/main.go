@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"easyoffer/question/api/handlers"
 	"easyoffer/question/internal/config"
 	"easyoffer/question/internal/events"
@@ -72,15 +73,22 @@ func main() {
 	}
 
 	questionRepo := repository.NewQuestionRepository(db)
-	publisher := events.NewNoopPublisher()
 	if cfg.KafkaEnabled {
-		publisher, err = events.NewKafkaPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
+		kafkaPublisher, err := events.NewKafkaPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
 		if err != nil {
 			log.Fatal("failed to initialize kafka publisher:", err)
 		}
+
+		outboxStore, ok := questionRepo.(events.OutboxStore)
+		if !ok {
+			log.Fatal("question repository does not implement outbox store")
+		}
+
+		dispatcher := events.NewOutboxDispatcher(outboxStore, kafkaPublisher, 50, 2*time.Second)
+		go dispatcher.Run(context.Background())
 	}
 
-	questionService := service.NewQuestionService(questionRepo, publisher)
+	questionService := service.NewQuestionService(questionRepo)
 	questionHandler := handlers.NewQuestionHandler(questionService)
 
 	g := gin.New()

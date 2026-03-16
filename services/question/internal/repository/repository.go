@@ -306,3 +306,80 @@ func newOutboxEvent(eventType string, q *domain.Question, questionID string) (*d
 		CreatedAt:     occurredAt,
 	}, nil
 }
+
+func (r *questionRepository) ListOutboxForDispatch(limit int, now time.Time) ([]*domain.OutboxEvent, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	rows := make([]domain.OutboxEvent, 0, limit)
+	err := r.db.
+		Where("status IN ? AND next_retry_at <= ?", []domain.OutboxStatus{
+			domain.OutboxStatusPending,
+			domain.OutboxStatusFailed,
+		}, now).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.OutboxEvent, 0, len(rows))
+	for i := range rows {
+		result = append(result, &rows[i])
+	}
+	return result, nil
+}
+
+func (r *questionRepository) MarkOutboxSent(eventID string, sentAt time.Time) error {
+	return r.db.Model(&domain.OutboxEvent{}).
+		Where("id = ?", strings.TrimSpace(eventID)).
+		Updates(map[string]interface{}{
+			"status":     domain.OutboxStatusSent,
+			"sent_at":    sentAt,
+			"last_error": "",
+		}).Error
+}
+
+func (r *questionRepository) MarkOutboxRetry(eventID string, nextRetryAt time.Time, lastError string) error {
+	errText := strings.TrimSpace(lastError)
+	if len(errText) > 1024 {
+		errText = errText[:1024]
+	}
+
+	return r.db.Model(&domain.OutboxEvent{}).
+		Where("id = ?", strings.TrimSpace(eventID)).
+		Updates(map[string]interface{}{
+			"status":        domain.OutboxStatusFailed,
+			"attempts":      gorm.Expr("attempts + 1"),
+			"next_retry_at": nextRetryAt,
+			"last_error":    errText,
+		}).Error
+}
+
+func (r *questionRepository) CountOutboxByStatus() (map[domain.OutboxStatus]int64, error) {
+	type statusCountRow struct {
+		Status domain.OutboxStatus
+		Count  int64
+	}
+
+	rows := make([]statusCountRow, 0, 3)
+	if err := r.db.Model(&domain.OutboxEvent{}).
+		Select("status, COUNT(*) AS count").
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	counts := map[domain.OutboxStatus]int64{
+		domain.OutboxStatusPending: 0,
+		domain.OutboxStatusFailed:  0,
+		domain.OutboxStatusSent:    0,
+	}
+	for _, row := range rows {
+		counts[row.Status] = row.Count
+	}
+
+	return counts, nil
+}

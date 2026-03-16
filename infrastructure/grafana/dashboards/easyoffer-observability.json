@@ -318,6 +318,102 @@
       ],
       "title": "Service Availability (up)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"pending\"}",
+          "legendFormat": "pending",
+          "refId": "A"
+        },
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"failed\"}",
+          "legendFormat": "failed",
+          "refId": "B"
+        },
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"sent\"}",
+          "legendFormat": "sent",
+          "refId": "C"
+        }
+      ],
+      "title": "Outbox Queue Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=\"sent\"}[5m]))",
+          "legendFormat": "sent",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=\"retry\"}[5m]))",
+          "legendFormat": "retry",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=~\"mark_sent_fail|mark_retry_fail|load_fail\"}[5m]))",
+          "legendFormat": "internal failures",
+          "refId": "C"
+        }
+      ],
+      "title": "Outbox Dispatch Outcomes",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -337,6 +433,6 @@
   "timezone": "browser",
   "title": "EasyOffer Observability",
   "uid": "easyoffer-observability",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
