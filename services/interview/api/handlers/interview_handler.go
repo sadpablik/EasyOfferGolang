@@ -125,3 +125,20 @@ func (h *InterviewHandler) GetResult(c *gin.Context) {
 
 	writeJSON(c, http.StatusOK, toResultResponse(result))
 }
+
+func (h *InterviewHandler) ReplayInterview(c *gin.Context) {
+	userID := strings.TrimSpace(c.GetHeader("X-User-ID"))
+	if userID == "" {
+		writeError(c, http.StatusUnauthorized, "missing X-User-ID header")
+		return
+	}
+
+	sessionID := strings.TrimSpace(c.Param("id"))
+	session, err := h.service.ReplaySession(c.Request.Context(), userID, sessionID)
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+
+	writeJSON(c, http.StatusOK, toReplayInterviewResponse(session))
+}

@@ -168,3 +168,12 @@ type InterviewResultResponse struct {
 	Repeat     int    `json:"repeat"`
 	FinishedAt string `json:"finished_at"`
 }
+
+type ReplayInterviewResponse struct {
+	SessionID  string `json:"session_id"`
+	Total      int    `json:"total"`
+	Answered   int    `json:"answered"`
+	Finished   bool   `json:"finished"`
+	FinishedAt string `json:"finished_at,omitempty"`
+	Replayed   bool   `json:"replayed"`
+}

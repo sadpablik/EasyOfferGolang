@@ -46,6 +46,7 @@ type InterviewService interface {
 	SubmitAnswer(ctx context.Context, userID, sessionID string, input SubmitAnswerInput) error
 	FinishSession(ctx context.Context, userID, sessionID string) (*domain.InterviewResult, error)
 	GetResult(ctx context.Context, userID, sessionID string) (*domain.InterviewResult, error)
+	ReplaySession(ctx context.Context, userID, sessionID string) (*domain.InterviewSession, error)
 }
 
 type interviewService struct {
@@ -115,23 +116,28 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 		StartedAt:    startedAt,
 	}
 
-	if err := s.appendEvent(ctx, session.ID, userID, domain.EventSessionStarted, domain.SessionStartedPayload{
+	event, err := s.appendEvent(ctx, session.ID, userID, domain.EventSessionStarted, domain.SessionStartedPayload{
 		Category:       input.Category,
 		AnswerFormat:   input.AnswerFormat,
 		Language:       input.Language,
 		RequestedCount: count,
 		Questions:      session.Questions,
 		StartedAt:      startedAt,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, nil, fmt.Errorf("failed to append session started event: %w", err)
 	}
 
-	if err := s.repo.Save(ctx, session); err != nil {
-		return nil, nil, fmt.Errorf("failed to save session: %w", err)
+	projected, err := s.projectEvent(ctx, *event)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to project session started event: %w", err)
+	}
+	if len(projected.Questions) == 0 {
+		return nil, nil, ErrNoQuestionsAvailable
 	}
 
-	firstQuestion := &session.Questions[0]
-	return session, firstQuestion, nil
+	firstQuestion := &projected.Questions[0]
+	return projected, firstQuestion, nil
 }
 
 func (s *interviewService) GetNextQuestion(ctx context.Context, userID, sessionID string) (*domain.QuestionSnapshot, bool, error) {
@@ -144,15 +150,11 @@ func (s *interviewService) GetNextQuestion(ctx context.Context, userID, sessionI
 		return nil, false, ErrSessionFinished
 	}
 
-	for i := session.CurrentIndex; i < len(session.Questions); i++ {
+	for i := 0; i < len(session.Questions); i++ {
 		if _, answered := session.Answers[session.Questions[i].ID]; answered {
 			continue
 		}
 
-		session.CurrentIndex = i
-		if err := s.repo.Save(ctx, session); err != nil {
-			return nil, false, fmt.Errorf("failed to update session index: %w", err)
-		}
 		return &session.Questions[i], true, nil
 	}
 
@@ -183,26 +185,19 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 	}
 	answeredAt := time.Now().UTC()
 
-	if err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
+	event, err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
 		QuestionID: input.QuestionID,
 		Status:     status,
 		UserAnswer: input.UserAnswer,
 		Note:       input.Note,
 		AnsweredAt: answeredAt,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("failed to append answer submitted event: %w", err)
 	}
 
-	session.Answers[input.QuestionID] = domain.SessionAnswer{
-		QuestionID: input.QuestionID,
-		Status:     status,
-		UserAnswer: input.UserAnswer,
-		Note:       input.Note,
-		AnsweredAt: answeredAt,
-	}
-
-	if err := s.repo.Save(ctx, session); err != nil {
-		return fmt.Errorf("failed to save answer: %w", err)
+	if _, err := s.projectEvent(ctx, *event); err != nil {
+		return fmt.Errorf("failed to project answer submitted event: %w", err)
 	}
 	return nil
 }
@@ -217,26 +212,29 @@ func (s *interviewService) FinishSession(ctx context.Context, userID, sessionID 
 	}
 
 	now := time.Now().UTC()
-	if err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventSessionFinished, domain.SessionFinishedPayload{
+	event, err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventSessionFinished, domain.SessionFinishedPayload{
 		FinishedAt: now,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("failed to append session finished event: %w", err)
 	}
 
-	session.FinishedAt = &now
-
-	if err := s.repo.Save(ctx, session); err != nil {
-		return nil, fmt.Errorf("failed to finish session: %w", err)
+	projected, err := s.projectEvent(ctx, *event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to project session finished event: %w", err)
+	}
+	if projected.FinishedAt == nil {
+		return nil, fmt.Errorf("failed to project finished state")
 	}
 
-	result := buildResult(session)
+	result := buildResult(projected)
 	return result, nil
 }
 
-func (s *interviewService) appendEvent(ctx context.Context, sessionID, userID string, eventType domain.InterviewEventType, payload interface{}) error {
+func (s *interviewService) appendEvent(ctx context.Context, sessionID, userID string, eventType domain.InterviewEventType, payload interface{}) (*domain.InterviewEvent, error) {
 	rawPayload, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	event := &domain.InterviewEvent{
@@ -249,7 +247,11 @@ func (s *interviewService) appendEvent(ctx context.Context, sessionID, userID st
 		Payload:    rawPayload,
 	}
 
-	return s.events.Append(ctx, event)
+	if err := s.events.Append(ctx, event); err != nil {
+		return nil, err
+	}
+
+	return event, nil
 }
 
 func (s *interviewService) GetResult(ctx context.Context, userID, sessionID string) (*domain.InterviewResult, error) {
@@ -263,4 +265,25 @@ func (s *interviewService) GetResult(ctx context.Context, userID, sessionID stri
 
 	result := buildResult(session)
 	return result, nil
+}
+
+func (s *interviewService) ReplaySession(ctx context.Context, userID, sessionID string) (*domain.InterviewSession, error) {
+	if userID == "" {
+		return nil, ErrMissingUserID
+	}
+
+	session, err := s.rebuildSessionFromEvents(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.UserID != userID {
+		return nil, ErrSessionForbidden
+	}
+
+	if err := s.repo.Save(ctx, session); err != nil {
+		return nil, fmt.Errorf("failed to persist replayed session: %w", err)
+	}
+
+	return session, nil
 }

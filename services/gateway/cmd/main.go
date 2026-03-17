@@ -105,6 +105,7 @@ func main() {
 	protected.POST("/interviews/:id/answer", g.answerInterviewQuestionHandler)
 	protected.POST("/interviews/:id/finish", g.finishInterviewHandler)
 	protected.GET("/interviews/:id/result", g.interviewResultHandler)
+	protected.POST("/interviews/:id/replay", g.replayInterviewHandler)
 	r.GET("/health", healthHandler)
 	r.GET("/metrics", g.metricsHandler)
 	r.GET("/swagger/*any", gin.WrapH(httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json"))))
@@ -558,6 +559,27 @@ func (g *gateway) interviewResultHandler(c *gin.Context) {
 
 	target := g.interviewURL + "/interviews/" + c.Param("id") + "/result"
 	g.proxyGet(c, target, userID)
+}
+
+// @Summary Replay interview session from event stream
+// @Tags interviews
+// @Produce json
+// @Param id path string true "Interview session ID"
+// @Success 200 {object} ReplayInterviewResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/interviews/{id}/replay [post]
+func (g *gateway) replayInterviewHandler(c *gin.Context) {
+	userID, ok := UserIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "missing user ID"})
+		return
+	}
+
+	target := g.interviewURL + "/interviews/" + c.Param("id") + "/replay"
+	g.proxyPost(c, target, userID)
 }
 
 // healthHandler returns service liveness status.

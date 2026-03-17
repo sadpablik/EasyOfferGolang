@@ -46,6 +46,8 @@ func (s *sessionRepositoryStub) Delete(_ context.Context, _ string) error {
 
 type eventStoreStub struct {
 	appendErr error
+	listErr   error
+	listCalls int
 	events    []domain.InterviewEvent
 }
 
@@ -60,9 +62,24 @@ func (s *eventStoreStub) Append(_ context.Context, event *domain.InterviewEvent)
 }
 
 func (s *eventStoreStub) ListBySession(_ context.Context, _ string) ([]domain.InterviewEvent, error) {
+	s.listCalls++
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
 	result := make([]domain.InterviewEvent, 0, len(s.events))
-	result = append(result, s.events...)
+	for i := range s.events {
+		result = append(result, s.events[i])
+	}
 	return result, nil
+}
+
+func mustRawJSON(t *testing.T, payload interface{}) json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed to marshal payload: %v", err)
+	}
+	return raw
 }
 
 type questionRepositoryStub struct {
@@ -284,5 +301,251 @@ func TestFinishSession_AppendsSessionFinishedEvent(t *testing.T) {
 	}
 	if payload.FinishedAt.IsZero() {
 		t.Fatalf("expected non-zero finished_at in payload")
+	}
+}
+
+func TestGetResult_RebuildsFromEventStoreWhenSnapshotMissing(t *testing.T) {
+	startedAt := time.Now().UTC().Add(-2 * time.Minute)
+	answeredAt := startedAt.Add(30 * time.Second)
+	finishedAt := startedAt.Add(1 * time.Minute)
+
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{
+		events: []domain.InterviewEvent{
+			{
+				ID:         "evt-1",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventSessionStarted,
+				OccurredAt: startedAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.SessionStartedPayload{
+					Questions: []domain.QuestionSnapshot{{ID: "q-1"}, {ID: "q-2"}},
+					StartedAt: startedAt,
+				}),
+			},
+			{
+				ID:         "evt-2",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventAnswerSubmitted,
+				OccurredAt: answeredAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.AnswerSubmittedPayload{
+					QuestionID: "q-1",
+					Status:     domain.StatusKnow,
+					AnsweredAt: answeredAt,
+				}),
+			},
+			{
+				ID:         "evt-3",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventSessionFinished,
+				OccurredAt: finishedAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.SessionFinishedPayload{
+					FinishedAt: finishedAt,
+				}),
+			},
+		},
+	}
+
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	result, err := svc.GetResult(context.Background(), "user-1", "session-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+	if result.Total != 2 {
+		t.Fatalf("expected total=2, got %d", result.Total)
+	}
+	if result.Answered != 1 || result.Know != 1 {
+		t.Fatalf("unexpected counters: answered=%d know=%d", result.Answered, result.Know)
+	}
+	if eventStore.listCalls == 0 {
+		t.Fatalf("expected event store to be used for replay")
+	}
+}
+
+func TestGetNextQuestion_RebuildsFromEventStoreWhenSnapshotMissing(t *testing.T) {
+	startedAt := time.Now().UTC().Add(-2 * time.Minute)
+	answeredAt := startedAt.Add(30 * time.Second)
+
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{
+		events: []domain.InterviewEvent{
+			{
+				ID:         "evt-1",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventSessionStarted,
+				OccurredAt: startedAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.SessionStartedPayload{
+					Questions: []domain.QuestionSnapshot{{ID: "q-1"}, {ID: "q-2"}},
+					StartedAt: startedAt,
+				}),
+			},
+			{
+				ID:         "evt-2",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventAnswerSubmitted,
+				OccurredAt: answeredAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.AnswerSubmittedPayload{
+					QuestionID: "q-1",
+					Status:     domain.StatusKnow,
+					AnsweredAt: answeredAt,
+				}),
+			},
+		},
+	}
+
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	question, hasMore, err := svc.GetNextQuestion(context.Background(), "user-1", "session-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !hasMore {
+		t.Fatalf("expected hasMore=true")
+	}
+	if question == nil || question.ID != "q-2" {
+		t.Fatalf("expected next question q-2, got %#v", question)
+	}
+	if repo.saveCalls != 0 {
+		t.Fatalf("expected read-only query path without snapshot writes, got save calls=%d", repo.saveCalls)
+	}
+}
+
+func TestGetResult_NoSnapshotAndNoEvents_ReturnsErrSessionNotFound(t *testing.T) {
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{events: []domain.InterviewEvent{}}
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	result, err := svc.GetResult(context.Background(), "user-1", "missing-session")
+	if !errors.Is(err, interviewservice.ErrSessionNotFound) {
+		t.Fatalf("expected ErrSessionNotFound, got: %v", err)
+	}
+	if result != nil {
+		t.Fatalf("expected nil result")
+	}
+}
+
+func TestReplaySession_RebuildsAndPersistsSnapshot(t *testing.T) {
+	startedAt := time.Now().UTC().Add(-1 * time.Minute)
+	answeredAt := startedAt.Add(20 * time.Second)
+
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{
+		events: []domain.InterviewEvent{
+			{
+				ID:         "evt-1",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventSessionStarted,
+				OccurredAt: startedAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.SessionStartedPayload{
+					Questions: []domain.QuestionSnapshot{{ID: "q-1"}, {ID: "q-2"}},
+					StartedAt: startedAt,
+				}),
+			},
+			{
+				ID:         "evt-2",
+				SessionID:  "session-1",
+				UserID:     "user-1",
+				Type:       domain.EventAnswerSubmitted,
+				OccurredAt: answeredAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.AnswerSubmittedPayload{
+					QuestionID: "q-1",
+					Status:     domain.StatusKnow,
+					AnsweredAt: answeredAt,
+				}),
+			},
+		},
+	}
+
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	session, err := svc.ReplaySession(context.Background(), "user-1", "session-1")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if session == nil {
+		t.Fatalf("expected non-nil session")
+	}
+	if session.ID != "session-1" {
+		t.Fatalf("expected session id=session-1, got %q", session.ID)
+	}
+	if len(session.Questions) != 2 {
+		t.Fatalf("expected 2 questions, got %d", len(session.Questions))
+	}
+	if len(session.Answers) != 1 {
+		t.Fatalf("expected 1 answer, got %d", len(session.Answers))
+	}
+	if repo.saveCalls != 1 {
+		t.Fatalf("expected snapshot save after replay, got %d", repo.saveCalls)
+	}
+	if repo.session == nil {
+		t.Fatalf("expected repository to persist replayed session")
+	}
+}
+
+func TestReplaySession_WhenUserMismatch_ReturnsErrSessionForbidden(t *testing.T) {
+	startedAt := time.Now().UTC().Add(-1 * time.Minute)
+
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{
+		events: []domain.InterviewEvent{
+			{
+				ID:         "evt-1",
+				SessionID:  "session-1",
+				UserID:     "another-user",
+				Type:       domain.EventSessionStarted,
+				OccurredAt: startedAt,
+				Version:    1,
+				Payload: mustRawJSON(t, domain.SessionStartedPayload{
+					Questions: []domain.QuestionSnapshot{{ID: "q-1"}},
+					StartedAt: startedAt,
+				}),
+			},
+		},
+	}
+
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	session, err := svc.ReplaySession(context.Background(), "user-1", "session-1")
+	if !errors.Is(err, interviewservice.ErrSessionForbidden) {
+		t.Fatalf("expected ErrSessionForbidden, got: %v", err)
+	}
+	if session != nil {
+		t.Fatalf("expected nil session")
+	}
+	if repo.saveCalls != 0 {
+		t.Fatalf("expected no snapshot save when forbidden")
+	}
+}
+
+func TestReplaySession_NoEvents_ReturnsErrSessionNotFound(t *testing.T) {
+	repo := &sessionRepositoryStub{}
+	eventStore := &eventStoreStub{events: []domain.InterviewEvent{}}
+	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+
+	session, err := svc.ReplaySession(context.Background(), "user-1", "missing-session")
+	if !errors.Is(err, interviewservice.ErrSessionNotFound) {
+		t.Fatalf("expected ErrSessionNotFound, got: %v", err)
+	}
+	if session != nil {
+		t.Fatalf("expected nil session")
+	}
+	if repo.saveCalls != 0 {
+		t.Fatalf("expected no snapshot save when events are missing")
 	}
 }

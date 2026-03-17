@@ -185,6 +185,21 @@ definitions:
       user:
         $ref: '#/definitions/main.UserResponse'
     type: object
+  main.ReplayInterviewResponse:
+    properties:
+      answered:
+        type: integer
+      finished:
+        type: boolean
+      finished_at:
+        type: string
+      replayed:
+        type: boolean
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
   main.ReviewQuestionRequest:
     properties:
       note:
@@ -442,6 +457,38 @@ paths:
       security:
       - BearerAuth: []
       summary: Get next interview question
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/replay:
+    post:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.ReplayInterviewResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replay interview session from event stream
       tags:
       - interviews
   /api/v1/interviews/{id}/result:

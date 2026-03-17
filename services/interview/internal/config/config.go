@@ -14,6 +14,8 @@ type Config struct {
 	RedisPassword      string
 	RedisDB            int
 	SessionTTL         time.Duration
+	ProjectorEnabled   bool
+	ProjectorInterval  time.Duration
 	KafkaEnabled       bool
 	KafkaBrokers       string
 	KafkaTopic         string
@@ -37,6 +39,10 @@ func Load() Config {
 	}
 
 	sessionTTLSeconds := parseIntEnv("INTERVIEW_SESSION_TTL_SECONDS", 7200)
+	projectorIntervalMS := parseIntEnv("INTERVIEW_PROJECTOR_INTERVAL_MS", 1000)
+	if projectorIntervalMS <= 0 {
+		projectorIntervalMS = 1000
+	}
 
 	return Config{
 		Port:               port,
@@ -45,9 +51,11 @@ func Load() Config {
 		RedisPassword:      strings.TrimSpace(os.Getenv("REDIS_PASSWORD")),
 		RedisDB:            parseIntEnv("REDIS_DB", 0),
 		SessionTTL:         time.Duration(sessionTTLSeconds) * time.Second,
-		KafkaEnabled: getEnvBool("KAFKA_ENABLED", false),
-		KafkaBrokers: getEnv("KAFKA_BROKERS", "kafka:29092"),
-		KafkaTopic:   getEnv("KAFKA_TOPIC_QUESTIONS", "questions.events"),
+		ProjectorEnabled:   getEnvBool("INTERVIEW_PROJECTOR_ENABLED", true),
+		ProjectorInterval:  time.Duration(projectorIntervalMS) * time.Millisecond,
+		KafkaEnabled:       getEnvBool("KAFKA_ENABLED", false),
+		KafkaBrokers:       getEnv("KAFKA_BROKERS", "kafka:29092"),
+		KafkaTopic:         getEnv("KAFKA_TOPIC_QUESTIONS", "questions.events"),
 		KafkaConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "interview-service"),
 	}
 }
@@ -79,7 +87,7 @@ func getEnvBool(key string, fallback bool) bool {
 	if raw == "" {
 		return fallback
 	}
-	
+
 	value, err := strconv.ParseBool(raw)
 	if err != nil {
 		return fallback

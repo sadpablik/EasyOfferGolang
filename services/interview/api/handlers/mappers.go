@@ -54,3 +54,23 @@ func toResultResponse(result *domain.InterviewResult) InterviewResultResponse {
 		FinishedAt: result.FinishedAt.Format(time.RFC3339),
 	}
 }
+
+func toReplayInterviewResponse(session *domain.InterviewSession) ReplayInterviewResponse {
+	if session == nil {
+		return ReplayInterviewResponse{Replayed: true}
+	}
+
+	response := ReplayInterviewResponse{
+		SessionID: session.ID,
+		Total:     len(session.Questions),
+		Answered:  len(session.Answers),
+		Finished:  session.FinishedAt != nil,
+		Replayed:  true,
+	}
+
+	if session.FinishedAt != nil {
+		response.FinishedAt = session.FinishedAt.Format(time.RFC3339)
+	}
+
+	return response
+}

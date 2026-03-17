@@ -63,6 +63,7 @@ func main() {
 	sessionRepo := repository.NewRedisSessionRepository(redisClient, cfg.SessionTTL)
 	questionRepo := repository.NewRedisQuestionRepository(redisClient)
 	eventStore := repository.NewRedisEventStore(redisClient)
+	checkpointRepo := repository.NewRedisProjectionCheckpointRepository(redisClient)
 	var questionConsumer *consumer.QuestionConsumer
 
 	if cfg.KafkaEnabled {
@@ -87,11 +88,25 @@ func main() {
 	interviewService := service.NewInterviewServiceWithEventStore(sessionRepo, questionRepo, eventStore, cfg.SessionTTL)
 	interviewHandler := handlers.NewInterviewHandler(interviewService)
 
+	if cfg.ProjectorEnabled {
+		if projectorStore, ok := eventStore.(repository.ProjectorEventStore); ok {
+			projector := service.NewInterviewProjector(projectorStore, sessionRepo, checkpointRepo, cfg.ProjectorInterval)
+			go func() {
+				if err := projector.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+					log.Printf("interview projector stopped: %v", err)
+				}
+			}()
+		} else {
+			log.Printf("interview projector is enabled but event store does not support projector API")
+		}
+	}
+
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	prometheus.MustRegister(httpRequestsTotal, httpRequestDuration)
 	consumer.RegisterMetrics(prometheus.DefaultRegisterer)
 	repository.RegisterMetrics(prometheus.DefaultRegisterer)
+	service.RegisterProjectorMetrics(prometheus.DefaultRegisterer)
 	r.Use(metricsMiddleware())
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatal(err)
@@ -105,6 +120,7 @@ func main() {
 	r.POST("/interviews/:id/answer", interviewHandler.SubmitAnswer)
 	r.POST("/interviews/:id/finish", interviewHandler.FinishInterview)
 	r.GET("/interviews/:id/result", interviewHandler.GetResult)
+	r.POST("/interviews/:id/replay", interviewHandler.ReplayInterview)
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	server := &http.Server{

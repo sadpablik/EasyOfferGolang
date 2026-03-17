@@ -20,6 +20,7 @@ type interviewServiceStub struct {
 	nextErr   error
 	submitErr error
 	resultErr error
+	replayErr error
 }
 
 func (s *interviewServiceStub) StartSession(_ context.Context, _ string, _ service.StartSessionInput) (*domain.InterviewSession, *domain.QuestionSnapshot, error) {
@@ -49,6 +50,19 @@ func (s *interviewServiceStub) GetResult(_ context.Context, _, _ string) (*domai
 		return nil, s.resultErr
 	}
 	return &domain.InterviewResult{}, nil
+}
+
+func (s *interviewServiceStub) ReplaySession(_ context.Context, _, _ string) (*domain.InterviewSession, error) {
+	if s.replayErr != nil {
+		return nil, s.replayErr
+	}
+	return &domain.InterviewSession{
+		ID:        "s-1",
+		Questions: []domain.QuestionSnapshot{{ID: "q-1"}, {ID: "q-2"}},
+		Answers: map[string]domain.SessionAnswer{
+			"q-1": {QuestionID: "q-1", Status: domain.StatusKnow},
+		},
+	}, nil
 }
 
 func TestErrorMapping_InvalidCount(t *testing.T) {
@@ -145,6 +159,60 @@ func TestErrorMapping_SessionNotFinished(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	if payload.Error != "session is not finished yet" {
+		t.Fatalf("unexpected error message: %q", payload.Error)
+	}
+}
+
+func TestReplayInterview_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := handlers.NewInterviewHandler(&interviewServiceStub{})
+	r := gin.New()
+	r.POST("/interviews/:id/replay", h.ReplayInterview)
+
+	req := httptest.NewRequest(http.MethodPost, "/interviews/s-1/replay", nil)
+	req.Header.Set("X-User-ID", "user-1")
+	res := httptest.NewRecorder()
+
+	r.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", res.Code)
+	}
+	var payload handlers.ReplayInterviewResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.SessionID != "s-1" {
+		t.Fatalf("unexpected session id: %q", payload.SessionID)
+	}
+	if !payload.Replayed {
+		t.Fatalf("expected replayed=true")
+	}
+	if payload.Total != 2 || payload.Answered != 1 {
+		t.Fatalf("unexpected replay payload: %#v", payload)
+	}
+}
+
+func TestReplayInterview_WhenSessionMissing_ReturnsNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := handlers.NewInterviewHandler(&interviewServiceStub{replayErr: service.ErrSessionNotFound})
+	r := gin.New()
+	r.POST("/interviews/:id/replay", h.ReplayInterview)
+
+	req := httptest.NewRequest(http.MethodPost, "/interviews/s-1/replay", nil)
+	req.Header.Set("X-User-ID", "user-1")
+	res := httptest.NewRecorder()
+
+	r.ServeHTTP(res, req)
+
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", res.Code)
+	}
+	var payload handlers.ErrorResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error != "session not found" {
 		t.Fatalf("unexpected error message: %q", payload.Error)
 	}
 }
