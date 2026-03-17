@@ -126,7 +126,8 @@ func (p *InterviewProjector) ProjectOnce(ctx context.Context) error {
 	for _, sessionID := range sessionIDs {
 		eventCount, err := p.events.EventCount(ctx, sessionID)
 		if err != nil {
-			return fmt.Errorf("failed to get event count for session %s: %w", sessionID, err)
+			log.Printf("failed to get event count for session %s: %v", sessionID, err)
+			continue
 		}
 		if eventCount == 0 {
 			continue
@@ -134,7 +135,8 @@ func (p *InterviewProjector) ProjectOnce(ctx context.Context) error {
 
 		checkpoint, err := p.checkpoints.Get(ctx, sessionID)
 		if err != nil {
-			return fmt.Errorf("failed to get projection checkpoint for session %s: %w", sessionID, err)
+			log.Printf("failed to get projection checkpoint for session %s: %v", sessionID, err)
+			continue
 		}
 		lag := eventCount - checkpoint
 		if lag > maxLag {
@@ -144,25 +146,9 @@ func (p *InterviewProjector) ProjectOnce(ctx context.Context) error {
 			continue
 		}
 
-		events, err := p.events.ListBySession(ctx, sessionID)
-		if err != nil {
-			return fmt.Errorf("failed to load session stream %s: %w", sessionID, err)
-		}
-		if len(events) == 0 {
+		if err := p.projectSessionWithRetry(ctx, sessionID); err != nil {
+			log.Printf("failed to project session %s after retries: %v", sessionID, err)
 			continue
-		}
-
-		session, err := replaySessionFromEvents(events)
-		if err != nil {
-			return fmt.Errorf("failed to replay stream %s: %w", sessionID, err)
-		}
-
-		if err := p.sessions.Save(ctx, session); err != nil {
-			return fmt.Errorf("failed to persist projected session %s: %w", sessionID, err)
-		}
-
-		if err := p.checkpoints.Set(ctx, sessionID, int64(len(events))); err != nil {
-			return fmt.Errorf("failed to save projection checkpoint for session %s: %w", sessionID, err)
 		}
 
 		projectedSessions++
@@ -170,6 +156,54 @@ func (p *InterviewProjector) ProjectOnce(ctx context.Context) error {
 
 	projectorProjectedSessionsTotal.Add(float64(projectedSessions))
 	projectorMaxLagEvents.Set(float64(maxLag))
+
+	return nil
+}
+
+func (p *InterviewProjector) projectSessionWithRetry(ctx context.Context, sessionID string) error {
+	const maxRetries = 3
+	var backoff = 1 * time.Millisecond
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err := p.projectSession(ctx, sessionID)
+		if err == nil {
+			return nil
+		}
+
+		if attempt < maxRetries-1 {
+			select {
+			case <-time.After(backoff):
+				backoff *= 2
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+
+	return fmt.Errorf("projection failed after %d retries", maxRetries)
+}
+
+func (p *InterviewProjector) projectSession(ctx context.Context, sessionID string) error {
+	events, err := p.events.ListBySession(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to load session stream: %w", err)
+	}
+	if len(events) == 0 {
+		return nil
+	}
+
+	session, err := replaySessionFromEvents(events)
+	if err != nil {
+		return fmt.Errorf("failed to replay stream: %w", err)
+	}
+
+	if err := p.sessions.Save(ctx, session); err != nil {
+		return fmt.Errorf("failed to persist projected session: %w", err)
+	}
+
+	if err := p.checkpoints.Set(ctx, sessionID, int64(len(events))); err != nil {
+		return fmt.Errorf("failed to save projection checkpoint: %w", err)
+	}
 
 	return nil
 }

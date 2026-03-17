@@ -185,7 +185,7 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 	}
 	answeredAt := time.Now().UTC()
 
-	event, err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
+	_, err = s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
 		QuestionID: input.QuestionID,
 		Status:     status,
 		UserAnswer: input.UserAnswer,
@@ -196,9 +196,6 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 		return fmt.Errorf("failed to append answer submitted event: %w", err)
 	}
 
-	if _, err := s.projectEvent(ctx, *event); err != nil {
-		return fmt.Errorf("failed to project answer submitted event: %w", err)
-	}
 	return nil
 }
 
@@ -212,22 +209,17 @@ func (s *interviewService) FinishSession(ctx context.Context, userID, sessionID 
 	}
 
 	now := time.Now().UTC()
-	event, err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventSessionFinished, domain.SessionFinishedPayload{
+	_, err = s.appendEvent(ctx, session.ID, session.UserID, domain.EventSessionFinished, domain.SessionFinishedPayload{
 		FinishedAt: now,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to append session finished event: %w", err)
 	}
 
-	projected, err := s.projectEvent(ctx, *event)
-	if err != nil {
-		return nil, fmt.Errorf("failed to project session finished event: %w", err)
-	}
-	if projected.FinishedAt == nil {
-		return nil, fmt.Errorf("failed to project finished state")
-	}
+	finishedSession := *session
+	finishedSession.FinishedAt = &now
 
-	result := buildResult(projected)
+	result := buildResult(&finishedSession)
 	return result, nil
 }
 
