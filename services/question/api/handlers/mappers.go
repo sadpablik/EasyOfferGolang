@@ -49,6 +49,10 @@ func toQuestionReviewResponses(reviews []*domain.QuestionReview) []QuestionRevie
 }
 
 func toMyQuestionResponse(question *domain.QuestionWithReview) MyQuestionResponse {
+	reviewedAt := ""
+	if !question.ReviewedAt.IsZero() {
+		reviewedAt = question.ReviewedAt.Format(time.RFC3339)
+	}
 	return MyQuestionResponse{
 		ID:           question.ID,
 		Title:        question.Title,
@@ -60,7 +64,7 @@ func toMyQuestionResponse(question *domain.QuestionWithReview) MyQuestionRespons
 		AuthorID:     question.AuthorID,
 		CreatedAt:    question.CreatedAt.Format(time.RFC3339),
 		ReviewStatus: string(question.ReviewStatus),
-		ReviewedAt:   question.ReviewedAt.Format(time.RFC3339),
+		ReviewedAt:   reviewedAt,
 	}
 }
 

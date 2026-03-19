@@ -118,6 +118,8 @@ services:
         condition: service_healthy
       question-migrations:
         condition: service_completed_successfully
+      kafka:
+        condition: service_started
 
   question-migrations:
     image: migrate/migrate:v4.18.3
@@ -154,6 +156,8 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_started
 
   gateway-swagger:
     image: golang:latest
@@ -176,10 +180,20 @@ services:
       - QUESTION_SERVICE_URL=http://question-service:8082
       - INTERVIEW_SERVICE_URL=http://interview-service:8083
       - JWT_SECRET=your-secret-key
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
     depends_on:
       - auth-service
       - question-service
       - interview-service
+
+  # frontend:
+  #   build: ../frontend
+  #   ports:
+  #     - "5173:5173"
+  #   environment:
+  #     - VITE_API_BASE_URL=http://localhost:8080
+  #   depends_on:
+  #     - gateway
 
   prometheus:
    image: prom/prometheus

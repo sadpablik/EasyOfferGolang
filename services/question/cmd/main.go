@@ -6,6 +6,7 @@ import (
 	"easyoffer/question/internal/config"
 	"easyoffer/question/internal/events"
 	"easyoffer/question/internal/repository"
+	"easyoffer/question/internal/seed"
 	"easyoffer/question/internal/service"
 	"log"
 	"strconv"
@@ -89,6 +90,28 @@ func main() {
 	}
 
 	questionService := service.NewQuestionService(questionRepo)
+	seedGenerated, seedInserted, seedTotal, seedHash, err := seed.EnsureSystemQuestionsGenerated(db, questionService)
+	if err != nil {
+		log.Fatal("failed to ensure system question seed script:", err)
+	}
+
+	if seedGenerated {
+		log.Printf(
+			"system question seed script generated: name=%s hash=%s inserted=%d total=%d",
+			seed.SystemQuestionsScriptName,
+			seedHash,
+			seedInserted,
+			seedTotal,
+		)
+	} else {
+		log.Printf(
+			"system question seed script already generated: name=%s hash=%s total=%d",
+			seed.SystemQuestionsScriptName,
+			seedHash,
+			seedTotal,
+		)
+	}
+
 	questionHandler := handlers.NewQuestionHandler(questionService)
 
 	g := gin.New()

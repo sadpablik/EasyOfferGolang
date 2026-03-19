@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"easyoffer/question/internal/service"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -268,12 +269,16 @@ func (h *QuestionHandler) GetMyQuestionReview(c *gin.Context) {
 
 	review, err := h.questionService.GetMyQuestionReview(userID, questionID)
 	if err != nil {
-		switch err {
-		case service.ErrReviewNotFound:
-			c.JSON(http.StatusNotFound, ErrorResponse{Error: "review not found"})
-		default:
-			c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch review"})
+		if errors.Is(err, service.ErrReviewNotFound) {
+			// 200 with empty review so the client does not get 404 for "not reviewed yet"
+			c.JSON(http.StatusOK, QuestionReviewResponse{
+				QuestionID: questionID,
+				Status:     "",
+				ReviewedAt: "",
+			})
+			return
 		}
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to fetch review"})
 		return
 	}
 

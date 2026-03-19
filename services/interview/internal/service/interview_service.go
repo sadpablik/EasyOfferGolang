@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"easyoffer/interview/internal/domain"
@@ -105,6 +106,9 @@ func (s *interviewService) StartSession(ctx context.Context, userID string, inpu
 	if len(questions) == 0 {
 		return nil, nil, ErrNoQuestionsAvailable
 	}
+	// Shuffle so each new session gets questions in random order.
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng.Shuffle(len(questions), func(i, j int) { questions[i], questions[j] = questions[j], questions[i] })
 	startedAt := time.Now().UTC()
 
 	session := &domain.InterviewSession{
@@ -185,7 +189,7 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 	}
 	answeredAt := time.Now().UTC()
 
-	_, err = s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
+	event, err := s.appendEvent(ctx, session.ID, session.UserID, domain.EventAnswerSubmitted, domain.AnswerSubmittedPayload{
 		QuestionID: input.QuestionID,
 		Status:     status,
 		UserAnswer: input.UserAnswer,
@@ -194,6 +198,10 @@ func (s *interviewService) SubmitAnswer(ctx context.Context, userID, sessionID s
 	})
 	if err != nil {
 		return fmt.Errorf("failed to append answer submitted event: %w", err)
+	}
+
+	if _, err := s.projectEvent(ctx, *event); err != nil {
+		return fmt.Errorf("failed to project answer to session: %w", err)
 	}
 
 	return nil
@@ -218,6 +226,9 @@ func (s *interviewService) FinishSession(ctx context.Context, userID, sessionID 
 
 	finishedSession := *session
 	finishedSession.FinishedAt = &now
+	if err := s.repo.Save(ctx, &finishedSession); err != nil {
+		return nil, fmt.Errorf("failed to persist finished session: %w", err)
+	}
 
 	result := buildResult(&finishedSession)
 	return result, nil

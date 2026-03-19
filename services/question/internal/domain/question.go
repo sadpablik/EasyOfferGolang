@@ -57,9 +57,15 @@ type QuestionCategory string
 type OutboxStatus string
 
 const (
-	CategoryResume   QuestionCategory = "resume"
-	CategoryTheory   QuestionCategory = "theory"
-	CategoryPractice QuestionCategory = "practice"
+	CategoryResume       QuestionCategory = "resume"
+	CategoryTheory       QuestionCategory = "theory"
+	CategoryPractice     QuestionCategory = "practice"
+	CategoryGolang       QuestionCategory = "golang"
+	CategoryConcurrency  QuestionCategory = "concurrency"
+	CategoryAlgorithms   QuestionCategory = "algorithms"
+	CategorySystemDesign QuestionCategory = "system_design"
+	CategoryKafka        QuestionCategory = "kafka"
+	CategoryRedis        QuestionCategory = "redis"
 )
 
 type AnswerFormat string
@@ -68,6 +74,23 @@ const (
 	AnswerFormatText AnswerFormat = "text"
 	AnswerFormatCode AnswerFormat = "code"
 )
+
+var validQuestionCategories = map[QuestionCategory]struct{}{
+	CategoryResume:       {},
+	CategoryTheory:       {},
+	CategoryPractice:     {},
+	CategoryGolang:       {},
+	CategoryConcurrency:  {},
+	CategoryAlgorithms:   {},
+	CategorySystemDesign: {},
+	CategoryKafka:        {},
+	CategoryRedis:        {},
+}
+
+func IsValidQuestionCategory(category QuestionCategory) bool {
+	_, ok := validQuestionCategories[category]
+	return ok
+}
 
 type ReviewStatus string
 

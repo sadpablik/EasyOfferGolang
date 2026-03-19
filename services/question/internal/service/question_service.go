@@ -49,9 +49,7 @@ func NewQuestionService(repo repository.QuestionRepository) QuestionService {
 
 func (s *questionService) CreateQuestion(title, content, authorID, category, answerFormat, language, starterCode string) (*domain.Question, error) {
 	cat := domain.QuestionCategory(category)
-	switch cat {
-	case domain.CategoryResume, domain.CategoryTheory, domain.CategoryPractice:
-	default:
+	if !domain.IsValidQuestionCategory(cat) {
 		return nil, ErrInvalidCategory
 	}
 
@@ -115,12 +113,10 @@ func (s *questionService) PatchQuestion(questionID, userID string, title, conten
 
 	if category != nil {
 		cat := domain.QuestionCategory(strings.TrimSpace(*category))
-		switch cat {
-		case domain.CategoryResume, domain.CategoryTheory, domain.CategoryPractice:
-			q.Category = cat
-		default:
+		if !domain.IsValidQuestionCategory(cat) {
 			return nil, ErrInvalidCategory
 		}
+		q.Category = cat
 	}
 
 	if answerFormat != nil {
@@ -177,9 +173,7 @@ func (s *questionService) GetQuestions(userID, category, status, answerFormat, l
 
 	cat := strings.TrimSpace(category)
 	if cat != "" {
-		switch domain.QuestionCategory(cat) {
-		case domain.CategoryResume, domain.CategoryTheory, domain.CategoryPractice:
-		default:
+		if !domain.IsValidQuestionCategory(domain.QuestionCategory(cat)) {
 			return nil, 0, ErrInvalidCategory
 		}
 	}
@@ -281,9 +275,7 @@ func (s *questionService) GetMyQuestions(userID, status, category string, limit,
 
 	cat := strings.TrimSpace(category)
 	if cat != "" {
-		switch domain.QuestionCategory(cat) {
-		case domain.CategoryResume, domain.CategoryTheory, domain.CategoryPractice:
-		default:
+		if !domain.IsValidQuestionCategory(domain.QuestionCategory(cat)) {
 			return nil, 0, ErrInvalidCategory
 		}
 	}

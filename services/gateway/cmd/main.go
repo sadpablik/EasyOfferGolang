@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -83,6 +84,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(cors.New(corsConfig()))
 	prometheus.MustRegister(gatewayHTTPRequestsTotal, gatewayHTTPRequestDuration)
 	r.Use(gatewayMetricsMiddleware())
 
@@ -121,6 +123,61 @@ func main() {
 
 	log.Printf("gateway starting on :%s", port)
 	log.Fatal(server.ListenAndServe())
+}
+
+func corsConfig() cors.Config {
+	origins := parseAllowedOrigins()
+
+	cfg := cors.Config{
+		AllowMethods: []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+			"X-User-ID",
+		},
+		ExposeHeaders:    []string{"Content-Length", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}
+
+	if len(origins) == 1 && origins[0] == "*" {
+		cfg.AllowAllOrigins = true
+		cfg.AllowCredentials = false
+		return cfg
+	}
+
+	cfg.AllowOrigins = origins
+	return cfg
+}
+
+func parseAllowedOrigins() []string {
+	raw := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	if raw == "" {
+		return []string{
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+			"http://localhost:3000",
+			"http://127.0.0.1:3000",
+		}
+	}
+
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for i := range parts {
+		origin := strings.TrimSpace(parts[i])
+		if origin == "" {
+			continue
+		}
+		origins = append(origins, origin)
+	}
+
+	if len(origins) == 0 {
+		return []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+	}
+
+	return origins
 }
 
 // metricsHandler returns Prometheus metrics for scraping.

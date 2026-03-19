@@ -172,18 +172,28 @@ func (r *questionRepository) GetReviewByUserAndQuestion(userID, questionID strin
 	return &review, nil
 }
 
+// GetMyQuestions returns questions created by the user (author_id = userID),
+// with optional left join to the user's review (review_status, reviewed_at).
+// status filter: only questions the author has reviewed with that status.
+// category filter: question category.
 func (r *questionRepository) GetMyQuestions(userID, status, category string, limit, offset int) ([]*domain.QuestionWithReview, int64, error) {
+	uid := strings.TrimSpace(userID)
+	if uid == "" {
+		return nil, 0, errors.New("user id is required for my questions")
+	}
+
 	rows := make([]domain.QuestionWithReview, 0)
 
-	countQuery := r.db.Table("question_reviews AS qr").
-		Joins("JOIN questions AS q ON q.id = qr.question_id").
-		Where("qr.user_id = ?", userID)
+	// Base: questions where author_id = user; join own review for review_status/reviewed_at.
+	countQuery := r.db.Table("questions").
+		Joins("LEFT JOIN question_reviews qr ON qr.question_id = questions.id AND qr.user_id = ?", uid).
+		Where("questions.author_id = ?", uid)
 
 	if status != "" {
 		countQuery = countQuery.Where("qr.status = ?", status)
 	}
 	if category != "" {
-		countQuery = countQuery.Where("q.category = ?", category)
+		countQuery = countQuery.Where("questions.category = ?", category)
 	}
 
 	total := int64(0)
@@ -191,32 +201,32 @@ func (r *questionRepository) GetMyQuestions(userID, status, category string, lim
 		return nil, 0, err
 	}
 
-	dataQuery := r.db.Table("question_reviews AS qr").
+	dataQuery := r.db.Table("questions").
 		Select(`
-            q.id,
-            q.title,
-            q.content,
-            q.category,
-            q.answer_format,
-            q.language,
-            q.starter_code,
-            q.author_id,
-            q.created_at,
+            questions.id,
+            questions.title,
+            questions.content,
+            questions.category,
+            questions.answer_format,
+            questions.language,
+            questions.starter_code,
+            questions.author_id,
+            questions.created_at,
             qr.status AS review_status,
             qr.reviewed_at
         `).
-		Joins("JOIN questions AS q ON q.id = qr.question_id").
-		Where("qr.user_id = ?", userID)
+		Joins("LEFT JOIN question_reviews qr ON qr.question_id = questions.id AND qr.user_id = ?", uid).
+		Where("questions.author_id = ?", uid)
 
 	if status != "" {
 		dataQuery = dataQuery.Where("qr.status = ?", status)
 	}
 	if category != "" {
-		dataQuery = dataQuery.Where("q.category = ?", category)
+		dataQuery = dataQuery.Where("questions.category = ?", category)
 	}
 
 	err := dataQuery.
-		Order("qr.reviewed_at DESC").
+		Order("questions.created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Scan(&rows).Error
