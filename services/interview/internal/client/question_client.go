@@ -15,10 +15,7 @@ import (
 	"easyoffer/interview/internal/domain"
 )
 
-var (
-	ErrNotImplemented                  = errors.New("question client is not implemented")
-	ErrQuestionServiceUnexpectedStatus = errors.New("question service returned unexpected status")
-)
+var ErrQuestionServiceUnexpectedStatus = errors.New("question service returned unexpected status")
 
 type QuestionClient interface {
 	ListQuestions(ctx context.Context, params ListQuestionsParams) ([]domain.QuestionSnapshot, error)
@@ -93,12 +90,3 @@ func (c *httpQuestionClient) ListQuestions(ctx context.Context, params ListQuest
 	return payload.Questions, nil
 }
 
-type NoopQuestionClient struct{}
-
-func NewNoopQuestionClient() QuestionClient {
-	return &NoopQuestionClient{}
-}
-
-func (c *NoopQuestionClient) ListQuestions(_ context.Context, _ ListQuestionsParams) ([]domain.QuestionSnapshot, error) {
-	return nil, ErrNotImplemented
-}
