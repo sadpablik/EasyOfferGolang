@@ -12,10 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var (
-	ErrNotImplemented  = errors.New("session repository is not implemented")
-	ErrSessionNotFound = errors.New("session not found")
-)
+var ErrSessionNotFound = errors.New("session not found")
 
 var redisOperationsTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
@@ -118,20 +115,3 @@ func sessionKey(sessionID string) string {
 	return sessionKeyPrefix + sessionID
 }
 
-type NoopSessionRepository struct{}
-
-func NewNoopSessionRepository() SessionRepository {
-	return &NoopSessionRepository{}
-}
-
-func (r *NoopSessionRepository) Save(_ context.Context, _ *domain.InterviewSession) error {
-	return ErrNotImplemented
-}
-
-func (r *NoopSessionRepository) Get(_ context.Context, _ string) (*domain.InterviewSession, error) {
-	return nil, ErrNotImplemented
-}
-
-func (r *NoopSessionRepository) Delete(_ context.Context, _ string) error {
-	return ErrNotImplemented
-}
