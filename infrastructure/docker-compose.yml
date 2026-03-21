@@ -186,15 +186,6 @@ services:
       - question-service
       - interview-service
 
-  # frontend:
-  #   build: ../frontend
-  #   ports:
-  #     - "5173:5173"
-  #   environment:
-  #     - VITE_API_BASE_URL=http://localhost:8080
-  #   depends_on:
-  #     - gateway
-
   prometheus:
    image: prom/prometheus
    ports:
