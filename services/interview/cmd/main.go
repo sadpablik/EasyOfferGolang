@@ -85,7 +85,7 @@ func main() {
 		}()
 	}
 
-	interviewService := service.NewInterviewServiceWithEventStore(sessionRepo, questionRepo, eventStore, cfg.SessionTTL)
+	interviewService := service.NewInterviewService(sessionRepo, questionRepo, eventStore, cfg.SessionTTL)
 	interviewHandler := handlers.NewInterviewHandler(interviewService)
 
 	if cfg.ProjectorEnabled {

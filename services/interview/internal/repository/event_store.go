@@ -139,24 +139,3 @@ func interviewEventStreamKey(sessionID string) string {
 	return interviewEventStreamPrefix + strings.TrimSpace(sessionID)
 }
 
-type NoopEventStore struct{}
-
-func NewNoopEventStore() EventStore {
-	return &NoopEventStore{}
-}
-
-func (s *NoopEventStore) Append(_ context.Context, _ *domain.InterviewEvent) error {
-	return nil
-}
-
-func (s *NoopEventStore) ListBySession(_ context.Context, _ string) ([]domain.InterviewEvent, error) {
-	return []domain.InterviewEvent{}, nil
-}
-
-func (s *NoopEventStore) ListSessions(_ context.Context) ([]string, error) {
-	return []string{}, nil
-}
-
-func (s *NoopEventStore) EventCount(_ context.Context, _ string) (int64, error) {
-	return 0, nil
-}

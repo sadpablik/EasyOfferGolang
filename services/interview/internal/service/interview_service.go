@@ -60,21 +60,9 @@ type interviewService struct {
 func NewInterviewService(
 	repo repository.SessionRepository,
 	questions repository.QuestionRepository,
-	sessionTTL time.Duration,
-) InterviewService {
-	return NewInterviewServiceWithEventStore(repo, questions, repository.NewNoopEventStore(), sessionTTL)
-}
-
-func NewInterviewServiceWithEventStore(
-	repo repository.SessionRepository,
-	questions repository.QuestionRepository,
 	events repository.EventStore,
 	sessionTTL time.Duration,
 ) InterviewService {
-	if events == nil {
-		events = repository.NewNoopEventStore()
-	}
-
 	return &interviewService{
 		repo:       repo,
 		questions:  questions,
