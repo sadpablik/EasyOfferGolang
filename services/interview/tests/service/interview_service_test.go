@@ -114,7 +114,7 @@ func TestGetNextQuestion_WhenAllQuestionsAnswered_ReturnsDoneStateWithoutError(t
 		},
 	}
 
-	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, &eventStoreStub{}, time.Minute)
 
 	question, hasMore, err := svc.GetNextQuestion(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -133,7 +133,7 @@ func TestGetNextQuestion_WhenAllQuestionsAnswered_ReturnsDoneStateWithoutError(t
 
 func TestSubmitAnswer_InvalidStatus_ReturnsErrInvalidStatus(t *testing.T) {
 	repo := &sessionRepositoryStub{}
-	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, &eventStoreStub{}, time.Minute)
 
 	err := svc.SubmitAnswer(context.Background(), "user-1", "session-1", interviewservice.SubmitAnswerInput{
 		QuestionID: "q-1",
@@ -163,7 +163,7 @@ func TestGetResult_BeforeFinish_ReturnsErrSessionNotFinished(t *testing.T) {
 		},
 	}
 
-	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, &eventStoreStub{}, time.Minute)
 
 	result, err := svc.GetResult(context.Background(), "user-1", "session-1")
 	if !errors.Is(err, interviewservice.ErrSessionNotFinished) {
@@ -180,7 +180,7 @@ func TestStartSession_AppendsSessionStartedEvent(t *testing.T) {
 		listResult: []domain.QuestionSnapshot{{ID: "q-1", Title: "Question 1", Category: "theory", AnswerFormat: "text"}},
 	}
 	eventStore := &eventStoreStub{}
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, questions, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, questions, eventStore, time.Minute)
 
 	session, firstQuestion, err := svc.StartSession(context.Background(), "user-1", interviewservice.StartSessionInput{
 		Category:     "theory",
@@ -231,7 +231,7 @@ func TestSubmitAnswer_AppendsAnswerSubmittedEvent(t *testing.T) {
 		},
 	}
 	eventStore := &eventStoreStub{}
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	err := svc.SubmitAnswer(context.Background(), "user-1", "session-1", interviewservice.SubmitAnswerInput{
 		QuestionID: "q-1",
@@ -277,7 +277,7 @@ func TestFinishSession_AppendsSessionFinishedEvent(t *testing.T) {
 		},
 	}
 	eventStore := &eventStoreStub{}
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	result, err := svc.FinishSession(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -351,7 +351,7 @@ func TestGetResult_RebuildsFromEventStoreWhenSnapshotMissing(t *testing.T) {
 		},
 	}
 
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	result, err := svc.GetResult(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -406,7 +406,7 @@ func TestGetNextQuestion_RebuildsFromEventStoreWhenSnapshotMissing(t *testing.T)
 		},
 	}
 
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	question, hasMore, err := svc.GetNextQuestion(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -426,7 +426,7 @@ func TestGetNextQuestion_RebuildsFromEventStoreWhenSnapshotMissing(t *testing.T)
 func TestGetResult_NoSnapshotAndNoEvents_ReturnsErrSessionNotFound(t *testing.T) {
 	repo := &sessionRepositoryStub{}
 	eventStore := &eventStoreStub{events: []domain.InterviewEvent{}}
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	result, err := svc.GetResult(context.Background(), "user-1", "missing-session")
 	if !errors.Is(err, interviewservice.ErrSessionNotFound) {
@@ -472,7 +472,7 @@ func TestReplaySession_RebuildsAndPersistsSnapshot(t *testing.T) {
 		},
 	}
 
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	session, err := svc.ReplaySession(context.Background(), "user-1", "session-1")
 	if err != nil {
@@ -519,7 +519,7 @@ func TestReplaySession_WhenUserMismatch_ReturnsErrSessionForbidden(t *testing.T)
 		},
 	}
 
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	session, err := svc.ReplaySession(context.Background(), "user-1", "session-1")
 	if !errors.Is(err, interviewservice.ErrSessionForbidden) {
@@ -536,7 +536,7 @@ func TestReplaySession_WhenUserMismatch_ReturnsErrSessionForbidden(t *testing.T)
 func TestReplaySession_NoEvents_ReturnsErrSessionNotFound(t *testing.T) {
 	repo := &sessionRepositoryStub{}
 	eventStore := &eventStoreStub{events: []domain.InterviewEvent{}}
-	svc := interviewservice.NewInterviewServiceWithEventStore(repo, &questionRepositoryStub{}, eventStore, time.Minute)
+	svc := interviewservice.NewInterviewService(repo, &questionRepositoryStub{}, eventStore, time.Minute)
 
 	session, err := svc.ReplaySession(context.Background(), "user-1", "missing-session")
 	if !errors.Is(err, interviewservice.ErrSessionNotFound) {
