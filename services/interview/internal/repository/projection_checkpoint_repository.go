@@ -72,16 +72,3 @@ func projectionCheckpointKey(sessionID string) string {
 	return projectionCheckpointKeyPrefix + strings.TrimSpace(sessionID)
 }
 
-type NoopProjectionCheckpointRepository struct{}
-
-func NewNoopProjectionCheckpointRepository() ProjectionCheckpointRepository {
-	return &NoopProjectionCheckpointRepository{}
-}
-
-func (r *NoopProjectionCheckpointRepository) Get(_ context.Context, _ string) (int64, error) {
-	return 0, nil
-}
-
-func (r *NoopProjectionCheckpointRepository) Set(_ context.Context, _ string, _ int64) error {
-	return nil
-}

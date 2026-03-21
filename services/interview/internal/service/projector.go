@@ -65,9 +65,6 @@ func NewInterviewProjector(
 	checkpoints repository.ProjectionCheckpointRepository,
 	pollInterval time.Duration,
 ) *InterviewProjector {
-	if checkpoints == nil {
-		checkpoints = repository.NewNoopProjectionCheckpointRepository()
-	}
 	if pollInterval <= 0 {
 		pollInterval = 1 * time.Second
 	}
