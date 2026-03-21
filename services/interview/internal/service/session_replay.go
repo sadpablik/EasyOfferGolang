@@ -278,34 +278,3 @@ func buildResult(session *domain.InterviewSession) *domain.InterviewResult {
 	return result
 }
 
-// — Noop —
-
-type NoopInterviewService struct{}
-
-func NewNoopInterviewService() InterviewService {
-	return &NoopInterviewService{}
-}
-
-func (s *NoopInterviewService) StartSession(_ context.Context, _ string, _ StartSessionInput) (*domain.InterviewSession, *domain.QuestionSnapshot, error) {
-	return nil, nil, ErrNotImplemented
-}
-
-func (s *NoopInterviewService) GetNextQuestion(_ context.Context, _ string, _ string) (*domain.QuestionSnapshot, bool, error) {
-	return nil, false, ErrNotImplemented
-}
-
-func (s *NoopInterviewService) SubmitAnswer(_ context.Context, _ string, _ string, _ SubmitAnswerInput) error {
-	return ErrNotImplemented
-}
-
-func (s *NoopInterviewService) FinishSession(_ context.Context, _ string, _ string) (*domain.InterviewResult, error) {
-	return nil, ErrNotImplemented
-}
-
-func (s *NoopInterviewService) GetResult(_ context.Context, _ string, _ string) (*domain.InterviewResult, error) {
-	return nil, ErrNotImplemented
-}
-
-func (s *NoopInterviewService) ReplaySession(_ context.Context, _ string, _ string) (*domain.InterviewSession, error) {
-	return nil, ErrNotImplemented
-}
