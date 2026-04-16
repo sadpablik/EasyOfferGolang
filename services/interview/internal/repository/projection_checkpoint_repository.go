@@ -71,4 +71,3 @@ func (r *redisProjectionCheckpointRepository) Set(ctx context.Context, sessionID
 func projectionCheckpointKey(sessionID string) string {
 	return projectionCheckpointKeyPrefix + strings.TrimSpace(sessionID)
 }
-

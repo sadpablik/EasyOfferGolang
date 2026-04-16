@@ -277,4 +277,3 @@ func buildResult(session *domain.InterviewSession) *domain.InterviewResult {
 	}
 	return result
 }
-

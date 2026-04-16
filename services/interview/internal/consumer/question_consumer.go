@@ -82,50 +82,50 @@ func (c *QuestionConsumer) Close() error {
 }
 
 func (c *QuestionConsumer) handleMessage(ctx context.Context, msg kafka.Message) error {
-    var event QuestionEvent
+	var event QuestionEvent
 
-    if err := json.Unmarshal(msg.Value, &event); err != nil {
-        ObserveConsume("unknown", err)
-        return err
-    }
+	if err := json.Unmarshal(msg.Value, &event); err != nil {
+		ObserveConsume("unknown", err)
+		return err
+	}
 
-    if event.EventID != "" {
-        if dedupStore, ok := c.repo.(repository.EventDedupStore); ok {
-            firstSeen, err := dedupStore.MarkEventProcessed(ctx, event.EventID, processedEventTTL)
-            if err != nil {
-                ObserveConsume(event.EventType, err)
-                return err
-            }
-            if !firstSeen {
-                log.Printf("skip duplicate question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
-                    event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
-                ObserveConsume(event.EventType, nil)
-                return nil
-            }
-        }
-    }
+	if event.EventID != "" {
+		if dedupStore, ok := c.repo.(repository.EventDedupStore); ok {
+			firstSeen, err := dedupStore.MarkEventProcessed(ctx, event.EventID, processedEventTTL)
+			if err != nil {
+				ObserveConsume(event.EventType, err)
+				return err
+			}
+			if !firstSeen {
+				log.Printf("skip duplicate question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
+					event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
+				ObserveConsume(event.EventType, nil)
+				return nil
+			}
+		}
+	}
 
-    var applyErr error
+	var applyErr error
 
-    switch event.EventType {
-    case EventQuestionCreated, EventQuestionUpdated:
-        applyErr = c.repo.Upsert(ctx, event.Payload.ToSnapshot())
-    case EventQuestionDeleted:
-        applyErr = c.repo.DeleteQuestion(ctx, event.Payload.QuestionID)
-    default:
-        log.Printf("skip unknown question event type=%s key=%s topic=%s partition=%d offset=%d",
-            event.EventType, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
-        ObserveConsume("unknown", nil)
-        return nil
-    }
+	switch event.EventType {
+	case EventQuestionCreated, EventQuestionUpdated:
+		applyErr = c.repo.Upsert(ctx, event.Payload.ToSnapshot())
+	case EventQuestionDeleted:
+		applyErr = c.repo.DeleteQuestion(ctx, event.Payload.QuestionID)
+	default:
+		log.Printf("skip unknown question event type=%s key=%s topic=%s partition=%d offset=%d",
+			event.EventType, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
+		ObserveConsume("unknown", nil)
+		return nil
+	}
 
-    ObserveConsume(event.EventType, applyErr)
-    if applyErr != nil {
-        return applyErr
-    }
+	ObserveConsume(event.EventType, applyErr)
+	if applyErr != nil {
+		return applyErr
+	}
 
-    log.Printf("processed question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
-        event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
+	log.Printf("processed question event type=%s event_id=%s key=%s topic=%s partition=%d offset=%d",
+		event.EventType, event.EventID, string(msg.Key), msg.Topic, msg.Partition, msg.Offset)
 
-    return nil
+	return nil
 }

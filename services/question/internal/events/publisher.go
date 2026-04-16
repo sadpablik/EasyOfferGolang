@@ -11,4 +11,3 @@ type Publisher interface {
 	PublishQuestionUpdated(ctx context.Context, question *domain.Question) error
 	PublishQuestionDeleted(ctx context.Context, questionID string) error
 }
-

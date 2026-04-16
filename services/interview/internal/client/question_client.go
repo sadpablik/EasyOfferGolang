@@ -89,4 +89,3 @@ func (c *httpQuestionClient) ListQuestions(ctx context.Context, params ListQuest
 
 	return payload.Questions, nil
 }
-

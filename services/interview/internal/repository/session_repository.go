@@ -114,4 +114,3 @@ func (r *redisSessionRepository) Delete(ctx context.Context, sessionID string) e
 func sessionKey(sessionID string) string {
 	return sessionKeyPrefix + sessionID
 }
-

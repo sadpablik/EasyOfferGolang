@@ -138,4 +138,3 @@ func (s *redisEventStore) EventCount(ctx context.Context, sessionID string) (int
 func interviewEventStreamKey(sessionID string) string {
 	return interviewEventStreamPrefix + strings.TrimSpace(sessionID)
 }
-
