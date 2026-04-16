@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - prometheus:9090
+
+  - job_name: interview-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - interview-service:8083
+
+  - job_name: auth-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - auth-service:8081
+
+  - job_name: question-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - question-service:8082
+
+  - job_name: gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - gateway:8080

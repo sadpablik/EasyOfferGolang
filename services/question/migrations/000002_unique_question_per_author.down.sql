@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS uq_questions_author_title_content_norm;

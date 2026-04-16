@@ -1,0 +1,935 @@
+basePath: /
+definitions:
+  main.CreateQuestionRequest:
+    properties:
+      answer_format:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      language:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  main.HealthResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  main.InterviewQuestionResponse:
+    properties:
+      answer_format:
+        type: string
+      author_id:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      language:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.InterviewResultResponse:
+    properties:
+      answered:
+        type: integer
+      dont_know:
+        type: integer
+      finished_at:
+        type: string
+      know:
+        type: integer
+      repeat:
+        type: integer
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  main.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  main.LoginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  main.MyQuestionResponse:
+    properties:
+      answer_format:
+        type: string
+      author_id:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      language:
+        type: string
+      review_status:
+        type: string
+      reviewed_at:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.MyQuestionsListResponse:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+      questions:
+        items:
+          $ref: '#/definitions/main.MyQuestionResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  main.NextInterviewQuestionResponse:
+    properties:
+      done:
+        type: boolean
+      question:
+        $ref: '#/definitions/main.InterviewQuestionResponse'
+    type: object
+  main.QuestionResponse:
+    properties:
+      answer_format:
+        type: string
+      author_id:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      language:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.QuestionReviewResponse:
+    properties:
+      id:
+        type: string
+      note:
+        type: string
+      question_id:
+        type: string
+      reviewed_at:
+        type: string
+      status:
+        type: string
+      user_answer:
+        type: string
+      user_id:
+        type: string
+    type: object
+  main.QuestionsListResponse:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+      questions:
+        items:
+          $ref: '#/definitions/main.QuestionResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  main.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  main.RegisterResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/main.UserResponse'
+    type: object
+  main.ReplayInterviewResponse:
+    properties:
+      answered:
+        type: integer
+      finished:
+        type: boolean
+      finished_at:
+        type: string
+      replayed:
+        type: boolean
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  main.ReviewQuestionRequest:
+    properties:
+      note:
+        type: string
+      status:
+        type: string
+      user_answer:
+        type: string
+    type: object
+  main.ReviewsListResponse:
+    properties:
+      reviews:
+        items:
+          $ref: '#/definitions/main.QuestionReviewResponse'
+        type: array
+      total:
+        type: integer
+    type: object
+  main.StartInterviewRequest:
+    properties:
+      answer_format:
+        type: string
+      category:
+        type: string
+      count:
+        type: integer
+      language:
+        type: string
+    type: object
+  main.StartInterviewResponse:
+    properties:
+      first_question:
+        $ref: '#/definitions/main.InterviewQuestionResponse'
+      session_id:
+        type: string
+      total:
+        type: integer
+    type: object
+  main.SubmitInterviewAnswerRequest:
+    properties:
+      note:
+        type: string
+      question_id:
+        type: string
+      status:
+        type: string
+      user_answer:
+        type: string
+    type: object
+  main.UpdateQuestionRequest:
+    properties:
+      answer_format:
+        type: string
+      category:
+        type: string
+      content:
+        type: string
+      language:
+        type: string
+      starter_code:
+        type: string
+      title:
+        type: string
+    type: object
+  main.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Public API exposed by the Gateway service.
+  title: EasyOffer Gateway API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Login user
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User registration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.RegisterResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Register user
+      tags:
+      - auth
+  /api/v1/interviews/{id}/answer:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Interview answer
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.SubmitInterviewAnswerRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit answer for interview question
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/finish:
+    post:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.InterviewResultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Finish interview session
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/next:
+    get:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.NextInterviewQuestionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get next interview question
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/replay:
+    post:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.ReplayInterviewResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Replay interview session from event stream
+      tags:
+      - interviews
+  /api/v1/interviews/{id}/result:
+    get:
+      parameters:
+      - description: Interview session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.InterviewResultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get interview result
+      tags:
+      - interviews
+  /api/v1/interviews/start:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Interview filters
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/main.StartInterviewRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.StartInterviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Start interview session
+      tags:
+      - interviews
+  /api/v1/me/questions:
+    get:
+      parameters:
+      - description: 'Filter by status: know, dont_know, repeat'
+        in: query
+        name: status
+        type: string
+      - description: 'Filter by category: resume, theory, practice'
+        in: query
+        name: category
+        type: string
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MyQuestionsListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my questions
+      tags:
+      - questions
+  /api/v1/me/reviews:
+    get:
+      parameters:
+      - description: 'Filter by status: know, dont_know, repeat'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.ReviewsListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my question reviews
+      tags:
+      - questions
+  /api/v1/questions:
+    get:
+      parameters:
+      - description: 'Filter by category: resume, theory, practice'
+        in: query
+        name: category
+        type: string
+      - description: 'Filter by my review status: know, dont_know, repeat'
+        in: query
+        name: status
+        type: string
+      - description: 'Filter by answer format: text, code'
+        in: query
+        name: answer_format
+        type: string
+      - description: Filter by language (case-insensitive exact match)
+        in: query
+        name: language
+        type: string
+      - description: Search in title/content (case-insensitive)
+        in: query
+        name: q
+        type: string
+      - description: Only questions without my review
+        in: query
+        name: unreviewed
+        type: boolean
+      - description: Page size (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: 'Sort field: created_at, title'
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Sort order: asc, desc'
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.QuestionsListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List questions
+      tags:
+      - questions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Create question
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateQuestionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.QuestionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create question
+      tags:
+      - questions
+  /api/v1/questions/{id}:
+    delete:
+      parameters:
+      - description: Question ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete question
+      tags:
+      - questions
+    get:
+      parameters:
+      - description: Question ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.QuestionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get question by ID
+      tags:
+      - questions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update question
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.UpdateQuestionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.QuestionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update question
+      tags:
+      - questions
+  /api/v1/questions/{id}/review:
+    get:
+      parameters:
+      - description: Question ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.QuestionReviewResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my review for question
+      tags:
+      - questions
+  /api/v1/questions/{id}/reviews:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Review
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.ReviewQuestionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.QuestionReviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Review a question (know / dont_know / repeat)
+      tags:
+      - questions
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.HealthResponse'
+      summary: Gateway health check
+      tags:
+      - health
+  /metrics:
+    get:
+      description: Prometheus metrics endpoint for monitoring systems.
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus metrics
+          schema:
+            type: string
+      summary: Gateway metrics
+      tags:
+      - observability
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

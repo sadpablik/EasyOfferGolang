@@ -1,0 +1,22 @@
+/docs
+
+# Environment variables
+.env
+
+# Go build artifacts
+bin/
+dist/
+
+# Vendor directory
+vendor/
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+          cache-dependency-path: |
+            services/auth/go.sum
+            services/question/go.sum
+            services/interview/go.sum
+            services/gateway/go.sum
+
+      - name: Check gofmt
+        run: |
+          unformatted=$(find services -type f -name '*.go' -print0 | xargs -0 gofmt -l)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files found:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Test auth service
+        working-directory: services/auth
+        run: go test ./...
+
+      - name: Test question service
+        working-directory: services/question
+        run: go test ./...
+
+      - name: Test interview service
+        working-directory: services/interview
+        run: go test ./...
+
+      - name: Test gateway service
+        working-directory: services/gateway
+        run: go test ./...
+
+      - name: Validate docker compose config
+        working-directory: infrastructure
+        run: docker compose config -q
+
+      - name: Check gateway swagger generation
+        working-directory: infrastructure
+        run: docker compose --profile tools run --rm gateway-swagger

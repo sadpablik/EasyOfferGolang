@@ -1,0 +1,438 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_gateway_http_requests_total[5m]))",
+          "legendFormat": "gateway",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_auth_http_requests_total[5m]))",
+          "legendFormat": "auth",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_http_requests_total[5m]))",
+          "legendFormat": "question",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_http_requests_total[5m]))",
+          "legendFormat": "interview",
+          "refId": "D"
+        }
+      ],
+      "title": "HTTP RPS by Service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_gateway_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "gateway 5xx",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_auth_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "auth 5xx",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "question 5xx",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "interview 5xx",
+          "refId": "D"
+        }
+      ],
+      "title": "HTTP 5xx Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(easyoffer_gateway_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "gateway p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(easyoffer_auth_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "auth p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(easyoffer_question_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "question p95",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(easyoffer_interview_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "interview p95",
+          "refId": "D"
+        }
+      ],
+      "title": "HTTP Latency P95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_question_kafka_publish_total{status=\"success\"}[5m]))",
+          "legendFormat": "publish success",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_kafka_publish_total{status=\"fail\"}[5m]))",
+          "legendFormat": "publish fail",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_kafka_consume_total{status=\"success\"}[5m]))",
+          "legendFormat": "consume success",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_kafka_consume_total{status=\"fail\"}[5m]))",
+          "legendFormat": "consume fail",
+          "refId": "D"
+        }
+      ],
+      "title": "Kafka Publish/Consume Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_interview_redis_operations_total{status=\"hit\"}[5m]))",
+          "legendFormat": "redis hit",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_redis_operations_total{status=\"miss\"}[5m]))",
+          "legendFormat": "redis miss",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_interview_redis_operations_total{status=\"error\"}[5m]))",
+          "legendFormat": "redis error",
+          "refId": "C"
+        }
+      ],
+      "title": "Redis Hit/Miss/Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "up{job=~\"auth-service|question-service|interview-service|gateway\"}",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Service Availability (up)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"pending\"}",
+          "legendFormat": "pending",
+          "refId": "A"
+        },
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"failed\"}",
+          "legendFormat": "failed",
+          "refId": "B"
+        },
+        {
+          "expr": "easyoffer_question_outbox_queue_size{status=\"sent\"}",
+          "legendFormat": "sent",
+          "refId": "C"
+        }
+      ],
+      "title": "Outbox Queue Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=\"sent\"}[5m]))",
+          "legendFormat": "sent",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=\"retry\"}[5m]))",
+          "legendFormat": "retry",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(easyoffer_question_outbox_dispatch_total{status=~\"mark_sent_fail|mark_retry_fail|load_fail\"}[5m]))",
+          "legendFormat": "internal failures",
+          "refId": "C"
+        }
+      ],
+      "title": "Outbox Dispatch Outcomes",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "easyoffer",
+    "observability"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "EasyOffer Observability",
+  "uid": "easyoffer-observability",
+  "version": 2,
+  "weekStart": ""
+}
